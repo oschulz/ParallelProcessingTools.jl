@@ -5,6 +5,9 @@ __precompile__(true)
 module MultiThreadingTools
 
 include.([
+    "threadsafe.jl",
+    "threadlocal.jl",
+    "threadedexec.jl",
 ])
 
 end # module
