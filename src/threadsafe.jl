@@ -98,18 +98,49 @@ const _stdout_lock = ThreadSafeReentrantLock()
 const _stderr_lock = ThreadSafeReentrantLock()
 
 
-@inline Base.info(::Type{ThreadSafe}, args...; kwargs...) = lock(_stderr_lock) do
+export threadsafe_info
+
+"""
+    threadsafe_info(...)
+
+Thread-safe wrapper for `info(STDERR, ...)`.
+"""
+@inline threadsafe_info(args...; kwargs...) = lock(_stderr_lock) do
     info(STDERR, args...; kwargs...)
 end
 
-@inline Base.warn(::Type{ThreadSafe}, args...; kwargs...) = lock(_stderr_lock) do
+
+export threadsafe_warn
+
+"""
+    threadsafe_warn(...)
+
+Thread-safe wrapper for `warn(STDERR, ...)`.
+"""
+@inline threadsafe_warn(args...; kwargs...) = lock(_stderr_lock) do
     warn(STDERR, args...; kwargs...)
 end
 
-@inline Base.print(::Type{ThreadSafe}, args...; kwargs...) = lock(_stdout_lock) do
+
+export threadsafe_print
+
+"""
+    threadsafe_print(...)
+
+Thread-safe wrapper for `print(STDOUT, ...)`.
+"""
+@inline threadsafe_print(args...; kwargs...) = lock(_stdout_lock) do
     info(STDOUT, args...; kwargs...)
 end
 
-@inline Base.write(::Type{ThreadSafe}, args...; kwargs...) = lock(_stdout_lock) do
+
+export threadsafe_info
+
+"""
+    threadsafe_write(...)
+
+Thread-safe wrapper for `write(STDOUT, ...)`.
+"""
+@inline threadsafe_write(args...; kwargs...) = lock(_stdout_lock) do
     write(STDOUT, args...; kwargs...)
 end
