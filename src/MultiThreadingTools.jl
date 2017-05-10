@@ -5,6 +5,7 @@ __precompile__(true)
 module MultiThreadingTools
 
 include.([
+    "workerfraction.jl",
     "threadsafe.jl",
     "threadlocal.jl",
     "threadedexec.jl",
