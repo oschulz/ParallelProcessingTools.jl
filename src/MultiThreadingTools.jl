@@ -8,6 +8,7 @@ include.([
     "threadsafe.jl",
     "threadlocal.jl",
     "threadedexec.jl",
+    "workpartition.jl",
 ])
 
 end # module
