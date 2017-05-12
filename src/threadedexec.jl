@@ -3,8 +3,8 @@
 using Base.Threads
 
 
-const _thread_local_error_err = ThreadLocalValue(Any)
-const _thread_local_error_set = ThreadLocalValue(Bool)
+const _thread_local_error_err = ThreadLocal{Any}()
+const _thread_local_error_set = ThreadLocal{Bool}()
 
 const _running_on_threads = Atomic{Int}(0)
 
@@ -18,8 +18,8 @@ function _check_thread_local_errors()
 end
 
 function _set_thread_local_error(err)
-    set_local!(_thread_local_error_err, err)
-    set_local!(_thread_local_error_set, true)
+    _thread_local_error_err[] = err
+    _thread_local_error_set[] = true
 end
 
 
@@ -57,4 +57,23 @@ end
 export @everythread
 macro everythread(body)
     _thread_exec_func(body)
+end
+
+
+
+function ThreadLocal{T}(f, ::Type{T})
+    result = ThreadLocal{T}()
+    @everythread result[] = f()
+    result
+end
+
+
+function Base.broadcast!(f, dest::ThreadLocal, As...)
+    @everythread dest[] = broadcast(f, map(threadlocal, As)...)
+    dest
+end
+
+function Base.map!(f, dest::ThreadLocal, As...)
+    @everythread dest[] = map(f, map(threadlocal, As)...)
+    dest
 end
