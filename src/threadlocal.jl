@@ -4,63 +4,57 @@ using Base.Threads
 using Compat
 
 
-export ThreadLocal
-@compat abstract type ThreadLocal{T} end
+export AbstractThreadLocal
+@compat abstract type AbstractThreadLocal{T} end
 
 
 """
-    get_local{T}(v::ThreadLocal{T})::T
-    get_local{T}(v::ThreadLocal{T}, init_function())::T
+    threadlocal{T}(x::T)::T
+    threadlocal{T}(x::AbstractThreadLocal{T})::T
 """
-function get_local end
-export get_local
+function threadlocal end
+export threadlocal
 
 
 """
-    set_local!{T}(v::ThreadLocal{T}, x)::T
-"""
-function set_local! end
-export set_local!
-
-
-"""
-    isdefined_local(v::ThreadLocal)::Bool
+    isdefined_local(v::AbstractThreadLocal)::Bool
 """
 function isdefined_local end
 export isdefined_local
 
 
 """
-    all_thread_values{T}(v::ThreadLocal{T})::AbstractVector{T}
+    all_thread_values{T}(v::AbstractThreadLocal{T})::AbstractVector{T}
 """
 function all_thread_values end
 export all_thread_values
 
 
 
-export ThreadLocalValue
+export ThreadLocal
 
-type ThreadLocalValue{T} <: ThreadLocal{T}
+type ThreadLocal{T} <: AbstractThreadLocal{T}
     value::Vector{T}
 
-    (::Type{ThreadLocalValue{T}}){T}() = new{T}(Vector{T}(nthreads()))
-end
+    (::Type{ThreadLocal{T}}){T}() = new{T}(Vector{T}(nthreads()))
 
-ThreadLocalValue{T}(::Type{T}) = ThreadLocalValue{T}()
-
-
-get_local(v::ThreadLocalValue) = v.value[threadid()]
-
-function get_local(v::ThreadLocalValue, init_function)
-    tid = threadid()
-    if !isdefined(v.value, tid)
-        v.value[tid] = init_function()
+    function (::Type{ThreadLocal{T}}){T}(xs::Vector{T})
+        (length(xs) != nthreads()) && throw(ArgumentError("Vectors length doesn't match number of threads"))
+        new{T}(xs)
     end
-    v.value[tid]
 end
 
-set_local!(v::ThreadLocalValue, x) = v.value[threadid()] = x
+ThreadLocal{T}(x::T) = ThreadLocal{T}([deepcopy(x) for _ in 1:nthreads()])
 
-isdefined_local(v::ThreadLocalValue) = isdefined(v.value, threadid())
 
-all_thread_values(v::ThreadLocalValue) = v.value
+@inline Base.getindex(x::ThreadLocal) = x.value[threadid()]
+
+@inline Base.setindex!(x::ThreadLocal, y) = x.value[threadid()] = y
+
+@inline threadlocal(x) = x
+@inline threadlocal(x::ThreadLocal) = x[]
+
+
+isdefined_local(v::ThreadLocal) = isdefined(v.value, threadid())
+
+all_thread_values(v::ThreadLocal) = v.value
