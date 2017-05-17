@@ -9,6 +9,7 @@ include.([
     "threadlocal.jl",
     "threadedexec.jl",
     "workpartition.jl",
+    "progressinfo.jl",
 ])
 
 end # module
