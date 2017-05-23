@@ -32,7 +32,7 @@ export processpartition
 
 
 function _workpartition_hi{T<:Integer}(n_items::T, n_partitions::T, i::T)
-    @assert n_items > 0
+    @assert n_items >= 0
     @assert n_partitions > 0
     @assert i >= 0 && i <= n_partitions
 
