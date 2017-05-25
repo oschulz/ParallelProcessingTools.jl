@@ -8,6 +8,7 @@ include.([
     "threadsafe.jl",
     "threadlocal.jl",
     "threadedexec.jl",
+    "processexec.jl",
     "workpartition.jl",
 ])
 
