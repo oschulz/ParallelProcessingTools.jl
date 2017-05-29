@@ -10,6 +10,7 @@ include.([
     "threadedexec.jl",
     "processexec.jl",
     "workpartition.jl",
+    "reductions.jl",
 ])
 
 end # module
