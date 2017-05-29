@@ -59,6 +59,9 @@ workpartition(range::StepRange, n::Integer, i::Integer) =
 workpartition(range::AbstractUnitRange, n::Integer, i::Integer) =
     (_workpartition_impl(length(range), n, i) - 1) + first(range)
 
+workpartition(A::AbstractArray, n::Integer, i::Integer) =
+    view(A, workpartition(linearindices(A), n, i))
+
 
 workpartitions(A, n::Integer) = (workpartition(A, n, i) for i in one(n):n)
 
