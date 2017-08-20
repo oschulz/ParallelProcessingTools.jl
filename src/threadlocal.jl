@@ -46,6 +46,11 @@ end
 
 ThreadLocal{T}(x::T) = ThreadLocal{T}([deepcopy(x) for _ in 1:nthreads()])
 
+function ThreadLocal(f::Base.Callable)
+    values = [f() for _ in 1:nthreads()]
+    ThreadLocal{eltype(values)}(values)
+end
+
 
 @inline Base.getindex(x::ThreadLocal) = x.value[threadid()]
 
