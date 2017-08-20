@@ -54,11 +54,33 @@ function _thread_exec_func(body)
 end
 
 
+export threads_all
+threads_all() = 1:nthreads()
+
+
+export threads_this
+function threads_this()
+    tid = threadid()
+    tid:tid
+end
+
+
 export @everythread
 macro everythread(body)
     _thread_exec_func(body)
 end
 
+
+export onthreads
+function onthreads(body, threadsel::AbstractVector{<:Integer})
+    if threadsel == threads_this()
+        body()
+    elseif threadsel == threads_all()
+        @everythread body()
+    else
+        error("Can only execute on current thread or all threads, not on a subset of threads")
+    end
+end
 
 
 function ThreadLocal{T}(f, ::Type{T})
