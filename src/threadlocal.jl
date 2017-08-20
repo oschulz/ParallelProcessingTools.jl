@@ -8,19 +8,15 @@ export AbstractThreadLocal
 @compat abstract type AbstractThreadLocal{T} end
 
 
+@deprecate isdefined_local(x) isassigned(x)
+
+
 """
     threadlocal{T}(x::T)::T
     threadlocal{T}(x::AbstractThreadLocal{T})::T
 """
 function threadlocal end
 export threadlocal
-
-
-"""
-    isdefined_local(v::AbstractThreadLocal)::Bool
-"""
-function isdefined_local end
-export isdefined_local
 
 
 """
@@ -60,6 +56,6 @@ end
 @inline threadlocal(x::ThreadLocal) = x[]
 
 
-isdefined_local(v::ThreadLocal) = isdefined(v.value, threadid())
+Base.isassigned(v::ThreadLocal) = isassigned(v.value, threadid())
 
 all_thread_values(v::ThreadLocal) = v.value
