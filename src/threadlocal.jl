@@ -54,6 +54,24 @@ end
 
 @inline Base.setindex!(x::ThreadLocal, y) = x.value[threadid()] = y
 
+
+@inline Base.get(x::ThreadLocal) = x[]
+
+@inline Base.get{T}(default::Base.Callable, x::ThreadLocal{T}) = isassigned(x) ? x[] : convert(T, default())
+
+@inline Base.get(x::ThreadLocal, default) = get(() -> default, x)
+
+function Base.get!{T}(default::Base.Callable, x::ThreadLocal{T})
+    if isassigned(x)
+        x[]
+    else
+        x[] = convert(T, default())
+    end
+end
+
+Base.get!(x::ThreadLocal, default) = get!(() -> default, x)
+
+
 @inline threadlocal(x) = x
 @inline threadlocal(x::ThreadLocal) = x[]
 
