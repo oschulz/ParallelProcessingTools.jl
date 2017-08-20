@@ -12,8 +12,10 @@ export AbstractThreadLocal
 
 
 """
-    threadlocal{T}(x::T)::T
-    threadlocal{T}(x::AbstractThreadLocal{T})::T
+    threadlocal(x) = x
+    threadlocal(x::ThreadLocal) = x[]
+
+Useful for unified access to plain values and thread-local values.
 """
 function threadlocal end
 export threadlocal
