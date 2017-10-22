@@ -4,13 +4,11 @@ __precompile__(true)
 
 module MultiThreadingTools
 
-include.([
-    "threadsafe.jl",
-    "threadlocal.jl",
-    "threadedexec.jl",
-    "processexec.jl",
-    "workpartition.jl",
-    "reductions.jl",
-])
+include("threadsafe.jl")
+include("threadlocal.jl")
+include("threadedexec.jl")
+include("processexec.jl")
+include("workpartition.jl")
+include("reductions.jl")
 
 end # module
