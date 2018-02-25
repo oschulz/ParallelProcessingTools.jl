@@ -1,7 +1,6 @@
 # This file is a part of MultiThreadingTools.jl, licensed under the MIT License (MIT).
 
 using Base.Threads
-using DistributedArrays
 
 
 """
@@ -72,5 +71,3 @@ threadpartition(A, n_threads::Integer = nthreads(), i::Integer = threadid()) =
 
 processpartition(A, n_procs::Integer = nworkers(), i::Integer = (nprocs() == 1) ? 1 : myid() - 1) =
     workpartition(A, n_procs, i)
-
-processpartition(A::DArray) = localpart(A)
