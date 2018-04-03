@@ -89,7 +89,7 @@ end
 end
 
 @inline Base.write(lio::LockableIO, args...; kwargs...) = map(lio) do io
-    read(io, args...; kwargs...)
+    write(io, args...; kwargs...)
 end
 
 
