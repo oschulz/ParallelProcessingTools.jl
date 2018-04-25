@@ -3,5 +3,6 @@
 import Compat.Test
 Test.@testset "Package MultiThreadingTools" begin
     include("threadsafe.jl")
-    include("threadlocal.jl")        
+    include("threadlocal.jl")
+    include("workpartition.jl")
 end
