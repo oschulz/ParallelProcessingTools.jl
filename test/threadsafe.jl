@@ -1,7 +1,7 @@
-# This file is a part of MultiThreadingTools.jl, licensed under the MIT License (MIT).
+# This file is a part of ParallelProcessingTools.jl, licensed under the MIT License (MIT).
 
-using MultiThreadingTools
-using Compat.Test
+using ParallelProcessingTools
+using Test
 
 @testset "threadsafe" begin
     
@@ -27,8 +27,8 @@ using Compat.Test
     end
 
     @testset "LockableIO" begin
-        lv = @inferred LockableIO(IOBuffer(8))
-        @test typeof(lv) <: LockableIO{Base.AbstractIOBuffer{Array{UInt8,1}}}
+        lv = @inferred LockableIO(IOBuffer())
+        @test typeof(lv) <: LockableIO{Base.Base.GenericIOBuffer{Array{UInt8,1}}}
         
         f = s -> write(s, 10)
         broadcast(f, lv)

@@ -1,4 +1,4 @@
-# This file is a part of MultiThreadingTools.jl, licensed under the MIT License (MIT).
+# This file is a part of ParallelProcessingTools.jl, licensed under the MIT License (MIT).
 
 using Base.Threads
 
@@ -31,7 +31,7 @@ function processpartition end
 export processpartition
 
 
-function _workpartition_hi{T<:Integer}(n_items::T, n_partitions::T, i::T)
+function _workpartition_hi(n_items::T, n_partitions::T, i::T) where {T<:Integer}
     @assert n_items >= 0
     @assert n_partitions > 0
     @assert i >= 0 && i <= n_partitions
@@ -54,13 +54,13 @@ function _workpartition_impl(n_items::Integer, n_partitions::Integer, i::Integer
 end
 
 workpartition(range::StepRange, n::Integer, i::Integer) =
-    step(range) * (_workpartition_impl(length(range), n, i) - 1) + first(range)
+    step(range) * (_workpartition_impl(length(range), n, i) .- 1) .+ first(range)
 
 workpartition(range::AbstractUnitRange, n::Integer, i::Integer) =
-    (_workpartition_impl(length(range), n, i) - 1) + first(range)
+    _workpartition_impl(length(range), n, i) .+ (first(range) - 1)
 
 workpartition(A::AbstractArray, n::Integer, i::Integer) =
-    view(A, workpartition(linearindices(A), n, i))
+    view(A, workpartition(eachindex(A), n, i))
 
 
 workpartitions(A, n::Integer) = (workpartition(A, n, i) for i in one(n):n)

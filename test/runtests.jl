@@ -1,7 +1,7 @@
-# This file is a part of MultiThreadingTools.jl, licensed under the MIT License (MIT).
+# This file is a part of ParallelProcessingTools.jl, licensed under the MIT License (MIT).
 
-import Compat.Test
-Test.@testset "Package MultiThreadingTools" begin
+import Test
+Test.@testset "Package ParallelProcessingTools" begin
     include("threadsafe.jl")
     include("threadlocal.jl")
     include("workpartition.jl")

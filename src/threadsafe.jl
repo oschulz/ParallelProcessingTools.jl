@@ -1,17 +1,14 @@
-# This file is a part of MultiThreadingTools.jl, licensed under the MIT License (MIT).
-
-using Base.Threads
-using Compat
+# This file is a part of ParallelProcessingTools.jl, licensed under the MIT License (MIT).
 
 
 export ThreadSafe
-@compat abstract type ThreadSafe{T} end
+abstract type ThreadSafe{T} end
 
 
 
 export ThreadSafeReentrantLock
 
-type ThreadSafeReentrantLock
+struct ThreadSafeReentrantLock
     thread_lock::RecursiveSpinLock
     task_lock::ReentrantLock
 
@@ -19,7 +16,7 @@ type ThreadSafeReentrantLock
 end
 
 function Base.lock(l::ThreadSafeReentrantLock)
-    # info("LOCKING $l")
+    # @info "LOCKING $l"
     lock(l.thread_lock)
     try
         lock(l.task_lock)
@@ -31,7 +28,7 @@ end
 
 
 function Base.unlock(l::ThreadSafeReentrantLock)
-    # info("UNLOCKING $l")
+    # @info "UNLOCKING $l"
     try
         unlock(l.task_lock)
     finally
@@ -43,14 +40,14 @@ end
 
 export LockableValue
 
-type LockableValue{T} <: ThreadSafe{T}
+struct LockableValue{T} <: ThreadSafe{T}
     x::T
     l::ThreadSafeReentrantLock
 
-    (::Type{LockableValue{T}}){T}(x::T) = new{T}(x, ThreadSafeReentrantLock())
+    (::Type{LockableValue{T}})(x::T) where {T} = new{T}(x, ThreadSafeReentrantLock())
 end
 
-LockableValue{T}(x::T) = LockableValue{T}(x)
+LockableValue(x::T) where {T} = LockableValue{T}(x)
 
 
 function Base.broadcast(f, lx::LockableValue)
@@ -62,19 +59,19 @@ end
 Base.map(f, lx::LockableValue) = broadcast(f, lx)
 
 
-@compat abstract type ThreadSafeIO <: IO end
+abstract type ThreadSafeIO <: IO end
 
 
 
 export LockableIO
 
-immutable LockableIO{T<:IO}
+struct LockableIO{T<:IO}
     lx::LockableValue{T}
 
-    (::Type{LockableIO{T}}){T<:IO}(x::T) = new{T}(LockableValue(x))
+    (::Type{LockableIO{T}})(x::T) where {T<:IO} = new{T}(LockableValue(x))
 end
 
-LockableIO{T<:IO}(x::T) = LockableIO{T}(x)
+LockableIO(x::T) where {T<:IO} = LockableIO{T}(x)
 
 
 @inline Base.broadcast(f, lio::LockableIO) = broadcast(f, lio.lx)
@@ -93,54 +90,17 @@ end
 end
 
 
+const _critical_section_lock = ThreadSafeReentrantLock()
 
-const _stdout_lock = ThreadSafeReentrantLock()
-const _stderr_lock = ThreadSafeReentrantLock()
-
-
-export threadsafe_info
-
-"""
-    threadsafe_info(...)
-
-Thread-safe wrapper for `info(STDERR, ...)`.
-"""
-@inline threadsafe_info(args...; kwargs...) = lock(_stderr_lock) do
-    info(STDERR, args...; kwargs...)
+macro critical(body)
+    quote
+        try
+            lock(_critical_section_lock)
+            $(esc(body))
+        finally
+            unlock(_critical_section_lock)
+        end
+    end
 end
 
-
-export threadsafe_warn
-
-"""
-    threadsafe_warn(...)
-
-Thread-safe wrapper for `warn(STDERR, ...)`.
-"""
-@inline threadsafe_warn(args...; kwargs...) = lock(_stderr_lock) do
-    warn(STDERR, args...; kwargs...)
-end
-
-
-export threadsafe_print
-
-"""
-    threadsafe_print(...)
-
-Thread-safe wrapper for `print(STDOUT, ...)`.
-"""
-@inline threadsafe_print(args...; kwargs...) = lock(_stdout_lock) do
-    info(STDOUT, args...; kwargs...)
-end
-
-
-export threadsafe_info
-
-"""
-    threadsafe_write(...)
-
-Thread-safe wrapper for `write(STDOUT, ...)`.
-"""
-@inline threadsafe_write(args...; kwargs...) = lock(_stdout_lock) do
-    write(STDOUT, args...; kwargs...)
-end
+export @critical

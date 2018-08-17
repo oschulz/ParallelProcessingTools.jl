@@ -1,4 +1,4 @@
-The MultiThreadingTools.jl package is licensed under the MIT "Expat" License:
+The ParallelProcessingTools.jl package is licensed under the MIT "Expat" License:
 
 > Copyright (c) 2017:
 >
