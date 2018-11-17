@@ -4,11 +4,13 @@ using ParallelProcessingTools
 using Test
 using Base.Threads
 
-@testset "threadlocal" begin
+@testset "getlocalvalue" begin
     @testset "ThreadLocal" begin
         tl = @inferred ThreadLocal{Float32}(undef)
         @test typeof(tl) <: ThreadLocal{Float32}
         @test length(tl.value) == nthreads()
+
+        @test (@inferred getallvalues(ThreadLocal{Int}(threadid))) == 1:nthreads()
 
         tmp = 2.5
         tl = @inferred ThreadLocal(tmp)
@@ -38,9 +40,7 @@ using Base.Threads
         @test get!(tl, "default") == "default"
         @test get(tl) == "default"
 
-        @test threadlocal(3) == 3
-        @test threadlocal(tl) == "default"
-
-        @test threadglobal(tl) == tl.value
+        @test getlocalvalue(3) == 3
+        @test getlocalvalue(tl) == "default"
     end
 end

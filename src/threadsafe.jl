@@ -16,7 +16,7 @@ struct ThreadSafeReentrantLock
 end
 
 function Base.lock(l::ThreadSafeReentrantLock)
-    # @info "LOCKING $l"
+    # @debug "LOCKING $l"
     lock(l.thread_lock)
     try
         lock(l.task_lock)
@@ -28,7 +28,7 @@ end
 
 
 function Base.unlock(l::ThreadSafeReentrantLock)
-    # @info "UNLOCKING $l"
+    # @debug "UNLOCKING $l"
     try
         unlock(l.task_lock)
     finally
@@ -90,17 +90,37 @@ end
 end
 
 
+
 const _critical_section_lock = ThreadSafeReentrantLock()
 
-macro critical(body)
+
+"""
+    @critical expr
+
+Mark code in `expr` as a critical section. Code in critical sections will
+never be executed in parallel (via multithreading) to any other critical
+section.
+
+`@critical` is very useful to mark non-threadsafe code.
+
+Example:
+
+```julia
+@onthreads allthreads() begin
+    @critical @info Base.Threads.threadid()
+end
+
+Without `@critical`, the above will typically crash Julia.
+```
+"""
+macro critical(expr)
     quote
         try
             lock(_critical_section_lock)
-            $(esc(body))
+            $(esc(expr))
         finally
             unlock(_critical_section_lock)
         end
     end
 end
-
 export @critical

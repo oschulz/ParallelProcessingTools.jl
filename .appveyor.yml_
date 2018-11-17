@@ -1,6 +1,7 @@
 # Documentation: https://github.com/JuliaCI/Appveyor.jl
 
 environment:
+  JULIA_NUM_THREADS: 4
   matrix:
   - julia_version: 0.7
   - julia_version: 1.0
@@ -33,6 +34,7 @@ install:
 build_script:
   - echo "%JL_BUILD_SCRIPT%"
   - C:\julia\bin\julia -e "%JL_BUILD_SCRIPT%"
+  # - C:\julia\bin\julia -e '@info "Running Julia with $(Base.Threads.nthreads()) threads"'
 
 test_script:
   - echo "%JL_TEST_SCRIPT%"

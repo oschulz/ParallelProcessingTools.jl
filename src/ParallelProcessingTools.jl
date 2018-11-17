@@ -5,10 +5,12 @@ __precompile__(true)
 module ParallelProcessingTools
 
 using Base.Threads
+using Distributed
 
 include("threadsafe.jl")
 include("threadlocal.jl")
-include("threadexec.jl")
+include("onthreads.jl")
+include("onprocs.jl")
 include("workpartition.jl")
 
 end # module

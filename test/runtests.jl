@@ -2,7 +2,9 @@
 
 import Test
 Test.@testset "Package ParallelProcessingTools" begin
-    include("threadsafe.jl")
-    include("threadlocal.jl")
-    include("workpartition.jl")
+    include("test_threadsafe.jl")
+    include("test_threadlocal.jl")
+    include("test_workpartition.jl")
+    include("test_onthreads.jl")
+    include("test_onprocs.jl")
 end

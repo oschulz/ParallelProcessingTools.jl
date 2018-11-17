@@ -3,6 +3,8 @@
 using ParallelProcessingTools
 using Test
 
+using Base.Threads
+
 @testset "threadsafe" begin
     
     @testset "ThreadSafeReentrantLock" begin
@@ -45,6 +47,11 @@ using Test
         write(lv, 11)
         map(seekstart, lv)
         @test read(lv, Int) == 11
+    end
+
+    @testset "critical" begin
+        @threads for i in 1:nthreads()
+            @critical @info Base.Threads.threadid()
+        end
     end    
 end
-

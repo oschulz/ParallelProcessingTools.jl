@@ -12,17 +12,17 @@ using Test
         cmp_res = [tmp, tmp+1]
         old = 0
         for j=1:part
-            res = @inferred ParallelProcessingTools._workpartition_hi(num, part, j)
+            res = @inferred ParallelProcessingTools._workpart_hi(num, part, j)
             @test res - old in cmp_res
             old = res
         end
-        res = @inferred ParallelProcessingTools._workpartition_hi(Int32(99), Int32(7), Int32(7))
+        res = @inferred ParallelProcessingTools._workpart_hi(Int32(99), Int32(7), Int32(7))
         @test res == Int32(99)
         @test typeof(res) <: Int32
-        @test_throws AssertionError ParallelProcessingTools._workpartition_hi(-1, 7, 1)
-        @test_throws AssertionError ParallelProcessingTools._workpartition_hi(20, 0, 1)
-        @test_throws AssertionError ParallelProcessingTools._workpartition_hi(20, 7, -1)
-        @test_throws AssertionError ParallelProcessingTools._workpartition_hi(0, 7, 8)
+        @test_throws AssertionError ParallelProcessingTools._workpart_hi(-1, 7, 1)
+        @test_throws AssertionError ParallelProcessingTools._workpart_hi(20, 0, 1)
+        @test_throws AssertionError ParallelProcessingTools._workpart_hi(20, 7, -1)
+        @test_throws AssertionError ParallelProcessingTools._workpart_hi(0, 7, 8)
 
         res = Array{Int}([])
         num = 24
@@ -30,7 +30,7 @@ using Test
         tmp = div(num, part)
         cmp_res = [tmp, tmp+1]
         for i =1:part
-            tmp = @inferred ParallelProcessingTools._workpartition_impl(num, part, i)
+            tmp = @inferred ParallelProcessingTools._workpart_scheme(Base.OneTo(num), part, i)
             @test length(tmp) in cmp_res
             res = vcat(res, tmp)
         end
@@ -43,7 +43,7 @@ using Test
         fi = 3
                 
         for i =1:part
-            res = vcat(res, @inferred workpartition(fi:stp:num, part, i))
+            res = vcat(res, @inferred workpart(fi:stp:num, 1:part, i))
         end
         @test res == collect(fi:stp:num)
 
@@ -53,7 +53,7 @@ using Test
         fi = 7
                 
         for i =1:part
-            res = vcat(res, @inferred workpartition(UnitRange(fi:num), part, i))
+            res = vcat(res, @inferred workpart(UnitRange(fi:num), 1:part, i))
         end
         @test res == collect(fi:num)
 
@@ -63,14 +63,23 @@ using Test
         res = Array{Float64}([])
                 
         for i =1:part
-            res = vcat(res, @inferred workpartition(cmp_res, part, i))
+            res = vcat(res, @inferred workpart(cmp_res, 1:part, i))
         end
         @test res == cmp_res
+    end
 
-        res = Array{Float64}([])
-        for i=workpartitions(cmp_res, part)
-            res = vcat(res, i)
+    @testset "Examples" begin
+        using Distributed, Base.Threads
+        @test begin
+            A = rand(100)
+            # ...
+            sub_A = workpart(A, procs(), myid())
+            # ...
+            idxs = workpart(eachindex(sub_A), allthreads(), threadid())
+            for i in idxs
+                # ...
+            end
+            true
         end
-        @test res == cmp_res
     end
 end
