@@ -5,17 +5,16 @@ using ParallelProcessingTools
 
 using Distributed
 
-if length(workers()) < 2
-    addprocs(2, exename = ParallelProcessingTools.mtjulia_exe())
-end
 
-
-@testset "distexec" begin
+@testset "onprocs" begin
     @testset "worker-init" begin
+        if length(workers()) < 2
+            @test addprocs(2, exename = ParallelProcessingTools.mtjulia_exe()) == [2, 3]
+        end
         @test length(workers()) >= 2
     end
 
-    @testset "onprocs" begin
+    @testset "macro onprocs" begin
         @everywhere using ParallelProcessingTools, Base.Threads
 
         @test (@onprocs workers() myid()) == workers()

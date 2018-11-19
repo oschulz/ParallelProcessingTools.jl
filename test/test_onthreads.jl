@@ -6,12 +6,12 @@ using ParallelProcessingTools
 using Base.Threads
 
 
-@testset "distexec" begin
-    @testset "threads-init" begin
-        @test nthreads() >= 2
+@testset "onthreads" begin
+    if nthreads() < 2
+        @warn "JULIA multithreading not enabled"
     end
 
-    @testset "onprocs" begin
+    @testset "macro onthreads" begin
         @test (begin
             tl = ThreadLocal(0)
             @onthreads allthreads() tl[] = threadid()
