@@ -49,4 +49,4 @@ NTHREADS=`get_num_threads "${NTHREADS}"`
 export OMP_NUM_THREADS="${NTHREADS}"
 export JULIA_NUM_THREADS="${NTHREADS}"
 
-${PRECMD} julia "$@"
+exec ${PRECMD} julia "$@"
