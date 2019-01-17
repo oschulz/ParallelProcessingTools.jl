@@ -9,12 +9,14 @@ using Base.Threads
     
     @testset "ThreadSafeReentrantLock" begin
         tsReLock = @inferred ThreadSafeReentrantLock()
-        lock(tsReLock)
-        @test islocked(tsReLock.thread_lock)
-        @test islocked(tsReLock.task_lock)
-        unlock(tsReLock)
-        @test !islocked(tsReLock.thread_lock)
-        @test !islocked(tsReLock.task_lock)
+        @static if VERSION < v"1.2-DEV.28"
+            lock(tsReLock)
+            @test islocked(tsReLock.thread_lock)
+            @test islocked(tsReLock.task_lock)
+            unlock(tsReLock)
+            @test !islocked(tsReLock.thread_lock)
+            @test !islocked(tsReLock.task_lock)
+        end
     end
     
     @testset "LockableValue" begin
