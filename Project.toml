@@ -1,0 +1,15 @@
+name = "ParallelProcessingTools"
+uuid = "8e8a01fc-6193-5ca1-a2f1-20776dae4199"
+version = "0.2.0"
+
+[deps]
+Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
+
+[compat]
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
