@@ -9,7 +9,7 @@ os:
 julia:
   - 1.0
   - 1.1
-  - nightly
+  # - nightly
 
 env:
   - JULIA_NUM_THREADS=4
@@ -23,9 +23,6 @@ matrix:
 
 notifications:
   email: false
-
-before_script:
-  - julia -e '@info "Running Julia with $(Base.Threads.nthreads()) threads"'
 
 after_success:
   # push coverage results to Codecov

@@ -2,6 +2,8 @@
 
 import Test
 Test.@testset "Package ParallelProcessingTools" begin
+    @info "Testing with $(Base.Threads.nthreads()) Julia threads."
+
     include("test_threadsafe.jl")
     include("test_threadlocal.jl")
     include("test_workpartition.jl")
