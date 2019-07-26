@@ -1,6 +1,60 @@
 # This file is a part of ParallelProcessingTools.jl, licensed under the MIT License (MIT).
 
 
+function _current_thread_selected(threadsel::Union{Integer,AbstractVector{<:Integer}})
+    tid = threadid()
+    checkindex(Bool, tid:tid, threadsel)
+end
+
+
+@static if VERSION >= v"1.3.0-alpha.0"
+
+
+# From Julia PR 32477:
+function _run_on(t::Task, tid)
+    @assert !istaskstarted(t)
+    t.sticky = true
+    ccall(:jl_set_task_tid, Cvoid, (Any, Cint), t, tid-1)
+    schedule(t)
+    return t
+end
+
+
+# Adapted from Julia PR 32477:
+function _threading_run(func, threadsel::AbstractVector{<:Integer})
+    tasks = Vector{Task}(undef, length(eachindex(threadsel)))
+    for tid in threadsel
+        i = firstindex(tasks) + (tid - first(threadsel))
+        tasks[i] = _run_on(Task(func), tid)
+    end
+    foreach(wait, tasks)
+    return nothing
+end
+
+_threading_run(func, threadsel::Integer) = _threading_run(func, threadsel:threadsel)
+
+
+function _thread_exec_func(threadsel, expr)
+    quote
+        local thread_body_wrapper_fun
+        let threadsel_eval = $(esc(threadsel))
+            function thread_body_wrapper_fun()
+                $(esc(expr))
+            end
+            if _current_thread_selected(threadsel_eval)
+                thread_body_wrapper_fun()
+            else
+                _threading_run(thread_body_wrapper_fun, threadsel_eval)
+            end
+            nothing
+        end
+    end
+end
+
+
+else #VERSION < v"1.3.0-alpha.0"
+
+
 const _thread_local_error_err = ThreadLocal{Any}(undef)
 const _thread_local_error_set = ThreadLocal{Bool}(undef)
 
@@ -18,17 +72,11 @@ function _set_thread_local_error(err)
     _thread_local_error_set[] = true
 end
 
-
 function _check_threadsel(threadsel::Union{Integer,AbstractVector{<:Integer}})
     if !checkindex(Bool, allthreads(), threadsel)
         throw(ArgumentError("Thread selection not within available threads"))
     end
     threadsel
-end
-
-function _current_thread_selected(threadsel::Union{Integer,AbstractVector{<:Integer}})
-    tid = threadid()
-    checkindex(Bool, tid:tid, threadsel)
 end
 
 
@@ -70,6 +118,10 @@ function _thread_exec_func(threadsel, expr)
 end
 
 
+end # Julia version-dependent code
+
+
+
 """
     allthreads()
 
@@ -98,7 +150,7 @@ exceptions to the caller.
 
 Example 1:
 
-```julia
+```juliaexpr
 tlsum = ThreadLocal(0.0)
 data = rand(100)
 @onthreads allthreads() begin
