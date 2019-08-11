@@ -11,12 +11,42 @@ using Base.Threads
         @warn "JULIA multithreading not enabled"
     end
 
+
+    function do_work(n)
+        if n < 0
+            throw(ArgumentError("n must be >= 0"))
+        end
+        s::Float64 = 0
+        for i in 1:n
+            if n % 1000 == 0
+                yield()
+            end
+            s += log(abs(asin(sin(Complex(log(i), log(i))))) + 1)
+        end
+        s
+    end
+
+
     @testset "macro onthreads" begin
         @test (begin
             tl = ThreadLocal(0)
             @onthreads allthreads() tl[] = threadid()
             getallvalues(tl)
         end) == 1:nthreads()
+    end
+
+    @testset "macro mt_async" begin
+        @test begin
+            n = 128
+            A = zeros(n)
+            @sync for i in eachindex(A)
+                @mt_async begin
+                    do_work(10^3)
+                    A[i] = log(i)
+                end
+            end
+            A == log.(1:n)
+        end
     end
 
     @testset "Examples" begin

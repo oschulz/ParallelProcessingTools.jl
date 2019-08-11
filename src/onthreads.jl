@@ -193,3 +193,33 @@ function ThreadLocal{T}(f::Base.Callable) where {T}
     @onthreads allthreads() result.value[threadid()] = f()
     result
 end
+
+
+"""
+    @mt_async expr
+
+Spawn a Julia task running `expr` asynchronously.
+
+Compatible with `@sync`. Uses a multi-threaded task scheduler if available (on
+Julia >= v1.3).
+
+Equivalent to `Base.@async` on Julia <= v1.2, equivalent to
+`Base.Threads.@spawn` on Julia >= v1.3.
+"""
+macro mt_async(expr)
+    # Code taken from Base.@async and Base.Threads.@spawn:
+    thunk = esc(:(()->($expr)))
+    var = esc(Base.sync_varname)
+    quote
+        local task = Task($thunk)
+        @static if VERSION >= v"1.3.0-alpha.0"
+            task.sticky = false
+        end
+        if $(Expr(:isdefined, var))
+            push!($var, task)
+        end
+        schedule(task)
+        task
+    end
+end
+export @mt_async
