@@ -6,7 +6,7 @@ using Test
 using Distributed
 
 if length(workers()) < 2
-    addprocs(2, exename = ParallelProcessingTools.mtjulia_exe())
+    addprocs(2)
 end
 
 @testset "workpartition" begin

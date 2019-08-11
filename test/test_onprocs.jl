@@ -9,8 +9,9 @@ using Distributed
 @testset "onprocs" begin
     @testset "worker-init" begin
         if length(workers()) < 2
-            @test addprocs(2, exename = ParallelProcessingTools.mtjulia_exe()) == [2, 3]
+            addprocs(2)
         end
+        eval(:(@everywhere using Distributed))
         @test length(workers()) >= 2
     end
 
