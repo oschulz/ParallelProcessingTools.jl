@@ -1,4 +1,4 @@
-# Documentation: https://github.com/JuliaCI/Appveyor.jl
+## Documentation: https://github.com/JuliaCI/Appveyor.jl
 
 environment:
   # JULIA_NUM_THREADS: 4
