@@ -10,6 +10,8 @@ This package follows the SPMD (Single Program Multiple Data) paradigm (like, e.g
 
 This package also implements thread-local variables and tooling to handle non-thread-safe code.
 
+In addition, the package provides some functions and macros designed to ease the transition to the new multi-threading model introduced in Julia v1.3.
+
 Note: Some features may not work on Windows, currently.
 
 
