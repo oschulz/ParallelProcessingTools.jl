@@ -30,6 +30,20 @@ using Distributed
         end) == ref_result
     end
 
+    @testset "macro mp_async" begin
+        @test begin
+            n = 128
+            A = Vector{Future}(undef, n)
+            @sync for i in 1:n
+                A[i] = @mp_async begin
+                    @assert myid() != 1
+                    log(i)
+                end
+            end
+            fetch.(A) == log.(1:n)
+        end
+    end
+
     @testset "mtjulia_exe" begin
         if Sys.islinux()
             @test fetch(@spawnat first(workers()) nthreads()) > 1

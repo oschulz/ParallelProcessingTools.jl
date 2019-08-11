@@ -33,6 +33,31 @@ end
 export @onprocs
 
 
+"""
+    @mp_async expr
+
+Run `expr` asynchronously on a worker process.
+
+Compatible with `@sync`.
+
+Equivalent to `Distributed.@spawn expr` on Julia <= v1.2, equivalent to
+`Distributed.@spawn :any expr` on Julia >= v1.3.
+"""
+macro mp_async(expr)
+    # Code taken from Distributed.@spawn:
+    thunk = esc(:(()->($expr)))
+    var = esc(Base.sync_varname)
+    quote
+        local ref = Distributed.spawn_somewhere($thunk)
+        if $(Expr(:isdefined, var))
+            push!($var, ref)
+        end
+        ref
+    end
+end
+export @mp_async
+
+
 function mtjulia_exe()
     if Sys.islinux()
         joinpath(@__DIR__, "..", "bin", "mtjulia.sh")
