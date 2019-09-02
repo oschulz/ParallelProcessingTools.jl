@@ -44,12 +44,6 @@ using Distributed
         end
     end
 
-    @testset "mtjulia_exe" begin
-        if Sys.islinux()
-            @test fetch(@spawnat first(workers()) nthreads()) > 1
-        end
-    end
-
     @testset "Examples" begin
         @test begin
             workers() == (@onprocs workers() myid())

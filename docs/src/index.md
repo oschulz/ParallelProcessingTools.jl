@@ -107,15 +107,6 @@ workers() == @onprocs workers() myid()
 Note: If the data can be expressed in terms of a `DistributedArrays.DArray`, it may be more appropriate and convenient to use the multiprocess execution tooling available in the package `DistributedArrays` (possibly combined with `ParallelProcessingTools.@onthreads`).
 
 
-## Creating multithreaded workers
-
-Julia currently doesn't provide an easy way to start multithreaded remote worker instances. `ParallelProcessingTools` provides a script `mtjulia.sh` (currently Linux-only) that will start Julia with `$JULIA_NUM_THREADS` set to a suitable value for each worker host (currently the number of physical processes on one NUMA node). `mtjulia_exe()` will return the absolute path to `mtjulia.sh`. So multithreaded workers can be spawned (via SSH) like this:
-
-```julia
-addprocs([hostname1, ...], exename = mtjulia_exe())
-```
-
-
 ### Example use case: 
 
 As a simple real-world use case, let's histogram distributed data on multiple processes and threads:
@@ -124,7 +115,7 @@ Set up a cluster of multithreaded workers and load the required packages:
 
 ```julia
 using Distributed, ParallelProcessingTools
-addprocs(["hostname1", ...], exename = mtjulia_exe())
+addprocs(2)
 @everywhere using ParallelProcessingTools, Base.Threads,
     DistributedArrays, Statistics, StatsBase
 ```

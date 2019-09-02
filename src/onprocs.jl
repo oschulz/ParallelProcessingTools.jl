@@ -56,15 +56,3 @@ macro mp_async(expr)
     end
 end
 export @mp_async
-
-
-function mtjulia_exe()
-    if Sys.islinux()
-        joinpath(@__DIR__, "..", "bin", "mtjulia.sh")
-    else
-        # No equivalent for "mtjulia.sh" implemented for non-Linux systems yet,
-        # return default exename:
-        joinpath(Sys.BINDIR, Base.julia_exename())
-    end
-end
-export mtjulia_exe

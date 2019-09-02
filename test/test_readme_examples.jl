@@ -12,7 +12,7 @@ end
 @testset "workpartition" begin
     @testset "parallel histogramming" begin
         using Distributed, ParallelProcessingTools
-        addprocs(2, exename = mtjulia_exe())
+        addprocs(2)
         @everywhere using ParallelProcessingTools, Base.Threads,
             DistributedArrays, Statistics, StatsBase
 
