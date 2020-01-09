@@ -180,7 +180,7 @@ export @onthreads
 
 macro onallthreads(expr)
     quote
-        Base.depwarn("`@onallthreads expr` is deprecated, use `@onallthreads allthreads() expr` instead.", nothing)
+        Base.depwarn("`@onallthreads expr` is deprecated, use `@onthreads allthreads() expr` instead.", nothing)
         $(_thread_exec_func(:(ParallelProcessingTools.allthreads()), expr))
     end
 end
