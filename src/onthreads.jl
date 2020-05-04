@@ -207,23 +207,19 @@ Equivalent to `Base.@async` on Julia <= v1.2, equivalent to
 `Base.Threads.@spawn` on Julia >= v1.3.
 """
 macro mt_async(expr)
-    @static if VERSION >= v"1.4.0"
-        :(Base.Threads.@spawn $(esc(expr)))
-    else
-        # Code taken from Base.@async and Base.Threads.@spawn:
-        thunk = esc(:(()->($expr)))
-        var = esc(Base.sync_varname)
-        quote
-            local task = Task($thunk)
-            @static if VERSION >= v"1.3.0-alpha.0"
-                task.sticky = false
-            end
-            if $(Expr(:isdefined, var))
-                push!($var, task)
-            end
-            schedule(task)
-            task
+    # Code taken from Base.@async and Base.Threads.@spawn:
+    thunk = esc(:(()->($expr)))
+    var = esc(Base.sync_varname)
+    quote
+        local task = Task($thunk)
+        @static if VERSION >= v"1.3.0-alpha.0"
+            task.sticky = false
         end
+        if $(Expr(:isdefined, var))
+            push!($var, task)
+        end
+        schedule(task)
+        task
     end
 end
 export @mt_async
