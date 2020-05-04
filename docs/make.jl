@@ -14,7 +14,7 @@ makedocs(
         prettyurls = !("local" in ARGS),
         canonical = "https://oschulz.github.io/ParallelProcessingTools.jl/stable/"
     ),
-    pages=[
+    pages = [
         "Home" => "index.md",
         "API" => "api.md",
         "LICENSE" => "LICENSE.md",
@@ -26,5 +26,6 @@ makedocs(
 
 deploydocs(
     repo = "github.com/oschulz/ParallelProcessingTools.jl.git",
-    forcepush = true
+    forcepush = true,
+    push_preview = true,
 )
