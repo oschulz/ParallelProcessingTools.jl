@@ -7,6 +7,8 @@ module ParallelProcessingTools
 using Base.Threads
 using Distributed
 
+using MacroTools
+
 include("threadsafe.jl")
 include("threadlocal.jl")
 include("onthreads.jl")

@@ -223,3 +223,57 @@ macro mt_async(expr)
     end
 end
 export @mt_async
+
+
+using MacroTools
+"""
+    @mt_out_of_order begin expr... end
+
+Runs all top-level expressions in `begin expr... end` on parallel tasks.
+On Julia >= v1.3, the tasks will run multi-threaded.
+
+Example:
+
+```
+@mt_out_of_order begin
+    a = foo()
+    bar()
+    c = baz()
+end
+
+will run `a = foo()`, `bar()` and `c = baz()` in parallel and in arbitrary
+order, results of assignments will appear in the outside scope.
+"""
+macro mt_out_of_order(ex)
+    if !(ex isa Expr && ex.head == :block)
+        throw(ErrorException("@mt_out_of_order expects a code block as it's argument"))
+    end
+
+    exprs = ex.args
+    idxs = eachindex(ex.args)
+    tasks = gensym(:tasks)
+    handle_results = Vector{Expr}()
+    for i in idxs
+        trg = nothing; val = nothing;
+        if @capture(exprs[i], trg_ = val_)
+            if val isa Expr
+                exprs[i] = :(push!($tasks, @mt_async($(esc(val)))))
+                push!(handle_results, :($(esc(trg)) = fetch(popfirst!($tasks))))
+            else
+                exprs[i] = esc(exprs[i])
+            end
+        elseif exprs[i] isa Expr
+            ftvar = gensym()
+            exprs[i] = :(push!($tasks, @mt_async($(esc(exprs[i])))))
+            push!(handle_results, :(wait(popfirst!($tasks))))
+        else
+            exprs[i] = esc(exprs[i])
+        end
+    end
+    pushfirst!(exprs, :($tasks = Vector{Task}()))
+    append!(exprs, handle_results)
+    push!(exprs, :(@assert isempty($tasks)))
+    push!(exprs, :nothing)
+    ex
+end
+export @mt_out_of_order

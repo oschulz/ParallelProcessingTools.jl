@@ -49,6 +49,23 @@ using Base.Threads
         end
     end
 
+    @testset "macro mt_out_of_order" begin
+        @test begin
+            b = 0
+            foo() = b = 9
+            bar() = 33
+
+            @mt_out_of_order begin
+                a = (sleep(0.05); 42)
+                foo()
+                c::Int = bar()
+
+                d = :trivial
+            end
+            (a, b, c, d) == (42, 9, 33, :trivial)
+        end
+    end
+
     @testset "Examples" begin
         @testset "Example 1" begin
             tlsum = ThreadLocal(0.0)
