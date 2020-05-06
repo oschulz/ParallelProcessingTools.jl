@@ -225,7 +225,6 @@ end
 export @mt_async
 
 
-using MacroTools
 """
     @mt_out_of_order begin expr... end
 
@@ -254,8 +253,9 @@ macro mt_out_of_order(ex)
     tasks = gensym(:tasks)
     handle_results = Vector{Expr}()
     for i in idxs
-        trg = nothing; val = nothing;
-        if @capture(exprs[i], trg_ = val_)
+        if exprs[i] isa Expr && exprs[i].head == :(=)
+            trg = exprs[i].args[1]
+            val = exprs[i].args[2]
             if val isa Expr
                 exprs[i] = :(push!($tasks, @mt_async($(esc(val)))))
                 push!(handle_results, :($(esc(trg)) = fetch(popfirst!($tasks))))
