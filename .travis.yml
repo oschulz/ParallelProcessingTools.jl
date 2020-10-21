@@ -43,6 +43,9 @@ jobs:
     - os: windows
       julia: 1.0
       env: JULIA_NUM_THREADS=4
+    - os: windows
+      julia: 1.3
+      env: JULIA_NUM_THREADS=4
   fast_finish: true
   exclude:
     # To recuce number of tests:
