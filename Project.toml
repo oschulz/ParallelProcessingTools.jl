@@ -1,6 +1,6 @@
 name = "ParallelProcessingTools"
 uuid = "8e8a01fc-6193-5ca1-a2f1-20776dae4199"
-version = "0.4.1"
+version = "0.4.2"
 
 [deps]
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
