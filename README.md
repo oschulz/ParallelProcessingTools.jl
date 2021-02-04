@@ -3,7 +3,7 @@
 [![Documentation for stable version](https://img.shields.io/badge/docs-stable-blue.svg)](https://oschulz.github.io/ParallelProcessingTools.jl/stable)
 [![Documentation for development version](https://img.shields.io/badge/docs-dev-blue.svg)](https://oschulz.github.io/ParallelProcessingTools.jl/dev)
 [![License](http://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)](LICENSE.md)
-[![Travis Build Status](https://travis-ci.com/oschulz/ParallelProcessingTools.jl.svg?branch=master)](https://travis-ci.com/oschulz/ParallelProcessingTools.jl)
+[![Build Status](https://github.com/oschulz/ParallelProcessingTools.jl/workflows/CI/badge.svg?branch=master)](https://github.com/oschulz/ParallelProcessingTools.jl/actions?query=workflow%3ACI)
 [![Codecov](https://codecov.io/gh/oschulz/ParallelProcessingTools.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/oschulz/ParallelProcessingTools.jl)
 
 This Julia package provides some tools to ease multithreaded and distributed programming, especially for more complex use cases and when using multiple processes with multiple threads on each process. It also provides functions and macros designed to ease the transition to the new multi-threading model introduced in Julia v1.3.
