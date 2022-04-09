@@ -36,27 +36,56 @@ g_progress_states = IdDict{Int,ProgressEntry}()
 g_progress_nextid = Atomic{Int}(0)
 
 
-function _progresss_channel_impl(ch::Channel{Tuple{Int,Float64,Bool}})
+function _individual_progress(state::ProgressState)
+    dt = state.t_current - state.t_start
+    completion = (state.progress - state.from) / (state.to / state.from)
+    return (dt, completion)
+end
+
+function _total_progress(d::IdDict{Int,ProgressEntry})
+    #!!! How to merge progress from parent and child states?
+    ct_sum, t_sum = reduce(values(d); init = (0.0, UInt64(0))) do sums, state
+        ct_sum, t_sum = sums
+        dt, completion = _individual_progress(state)
+        oftype(ct_sum)(ct_sum + dt * completion), oftype(t_sum)(t_sum + dt)
+    end
+    ct_sum/t_sum
+end
+
+
+struct ProgressMessage
+    id::Int
+    progress::Float64
+    t_current::UInt64
+    done::Bool
+end
+
+
+function _progresss_channel_impl(ch::Channel{ProgressMessage})
     while true
         try
             lock(g_progress_lock)
             if isempty(g_progress_states)
                 break
             else
-                id, progress, done = take!(ch)
+                id, progress, t_current, done = take!(ch)
                 entry = g_progress_states[id]
-                ProgressState(entry.state, progress, t_current)
-                new_entry = ProgressEntry(entry.from, entry.to, progress)
-                g_progress_states[id] = new_entry
+                entry.state = ProgressState(entry.state, progress, t_current)
 
-                #!!!!! show progress
-                @info "Total progress:"
+                #!!!!! TODO: show progress properly
+                rel_progress = _total_progress(g_progress_states)
+                @info "Total progress: $(rel_progress * 100)%"
+
+                if done
+                    delete!(g_progress_states, id)
+                end
             end
         finally
             unlock(g_progress_lock)
         end
     end
 end
+
 
 function _register_progress_impl(description::AbstractString, state::ProgressState, parent::Union{Int,Nothing})
     try
@@ -66,7 +95,7 @@ function _register_progress_impl(description::AbstractString, state::ProgressSta
         if isnothing(g_progress_channel) || !isopen(g_progress_channel)
             @assert isempty(g_progress_states)
             g_progress_states[id] = entry
-            g_progress_channel = Channel(_progresss_channel_impl, 1000, spawn = true)
+            g_progress_channel = Channel{ProgressMessage}(_progresss_channel_impl, 1000, spawn = true)
         else
             @assert !haskey(g_progress_states, id)
             g_progress_states[id] = entry
