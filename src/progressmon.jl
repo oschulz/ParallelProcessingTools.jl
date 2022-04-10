@@ -9,6 +9,11 @@
 # on large distributed systems.
 
 
+#!!!! New concept: ProgressTrackers reporting to ProgressCollectors, which
+# report to parent ProgressCollectors. Root ProgressCollector(s) produce
+# output via various methods.
+
+
 struct ProgressState
     from::Float64
     to::Float64
