@@ -1,6 +1,8 @@
 # This file is a part of ParallelProcessingTools.jl, licensed under the MIT License (MIT).
 
 
+#!!!! Measure time centrally, not locally
+
 struct ProgressState
     from::Float64
     to::Float64
