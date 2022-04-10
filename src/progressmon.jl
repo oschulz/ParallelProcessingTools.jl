@@ -3,6 +3,12 @@
 
 #!!!! Measure time centrally, not locally
 
+
+#!!!! Allow for multiple ProgressMessage channels that may run on processes
+# other than number 1, to enable hierarchical data collection schemes
+# on large distributed systems.
+
+
 struct ProgressState
     from::Float64
     to::Float64
