@@ -9,4 +9,5 @@ Test.@testset "Package ParallelProcessingTools" begin
     include("test_workpartition.jl")
     include("test_onthreads.jl")
     include("test_onprocs.jl")
+    include("test_progressmon.jl")
 end
