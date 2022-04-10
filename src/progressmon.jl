@@ -133,16 +133,33 @@ function ProgressTracker(description::AbstractString, state::ProgressState = Pro
     main_process = 1
     parent_id = isnothing(parent) ? nothing : parent.id
     ###!!!! ToDo: Direct call if running on main_process:
-    id, channel = remotecall_fetch(_register_progress_impl, main_process, String(description), state, parent_id)
+    #!!!id, channel = remotecall_fetch(_register_progress_impl, main_process, String(description), state, parent_id)
+    id, channel = _register_progress_impl(String(description), state, parent_id)
     ProgressTracker(id, channel)
 end
 
 function Base.close(tracker::ProgressTracker)
+    @info "DEBUG: Sending to $(tracker.channel)" isopen(tracker.channel)
     push!(tracker.channel, ProgressMessage(tracker.id, NaN, time_ns(), true))
+    @info "DEBUG: Sent to $(tracker.channel)" isopen(tracker.channel)
 end
 
 Base.push!(tracker::ProgressTracker, progress::Real) = push!(tracker, Float64(progress))
 
 function Base.push!(tracker::ProgressTracker, progress::Float64)
+    @info "DEBUG: Sending to $(tracker.channel)" isopen(tracker.channel)
     push!(tracker.channel, ProgressMessage(tracker.id, Float64(progress), time_ns(), false))
+    @info "DEBUG: Sent to $(tracker.channel)" isopen(tracker.channel)
 end
+
+
+#=
+# Testing:
+
+using ParallelProcessingTools
+a = ProgressTracker("foo")
+push!(a, 0.1)
+sleep(1)
+isopen(ParallelProcessingTools.g_progress_channel)
+
+=#
