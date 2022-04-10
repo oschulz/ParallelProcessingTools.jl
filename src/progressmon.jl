@@ -4,20 +4,25 @@
 struct ProgressState
     from::Float64
     to::Float64
-    t_start::UInt64
     progress::Float64
+    t_start::UInt64
     t_current::UInt64
 end
 
-ProgressState() = ProgressState(0, 1, time_ns(), 0)
+ProgressState() = ProgressState(0, 1, 0)
 
-ProgressState(old::ProgressState, progress::Float64, t_current::UInt64) =
-    ProgressState(old.from, old.to, old.t_start, progress, t_current)
+function ProgressState(from::Real, to::Real, progress::Real)
+    t = time_ns()
+    ProgressState(from, to, progress, t, t)
+end
+
+ProgressState(old::ProgressState, progress::Real, t_current::UInt64) =
+    ProgressState(old.from, old.to, progress, old.t_start, t_current)
 
 
 mutable struct ProgressEntry
     id::Int
-    parent::Int
+    parent::Union{Int,Nothing}
     description::String
     state::ProgressState
 end
@@ -62,23 +67,33 @@ end
 
 
 function _progresss_channel_impl(ch::Channel{ProgressMessage})
+    @info "DEBUG: ProgressMessage channel $ch" isopen(ch)
     while true
         try
             lock(g_progress_lock)
             if isempty(g_progress_states)
+                global g_progress_channel = nothing
+                @info "DEBUG: Closing ProgressMessage channel"
                 break
+            end
+        finally
+            unlock(g_progress_lock)
+        end
+
+        @info "DEBUG: Listening on channel $ch" isopen(ch)
+        id, progress, t_current, done = take!(ch)
+        @info "DEBUG: Received state from id $id"
+
+        try
+            lock(g_progress_lock)
+            if done
+                # Ignore progress value
+                delete!(g_progress_states, id)
             else
-                id, progress, t_current, done = take!(ch)
                 entry = g_progress_states[id]
                 entry.state = ProgressState(entry.state, progress, t_current)
-
-                #!!!!! TODO: show progress properly
                 rel_progress = _total_progress(g_progress_states)
                 @info "Total progress: $(rel_progress * 100)%"
-
-                if done
-                    delete!(g_progress_states, id)
-                end
             end
         finally
             unlock(g_progress_lock)
@@ -95,7 +110,7 @@ function _register_progress_impl(description::AbstractString, state::ProgressSta
         if isnothing(g_progress_channel) || !isopen(g_progress_channel)
             @assert isempty(g_progress_states)
             g_progress_states[id] = entry
-            g_progress_channel = Channel{ProgressMessage}(_progresss_channel_impl, 1000, spawn = true)
+            global g_progress_channel = Channel{ProgressMessage}(_progresss_channel_impl, 1000, spawn = true)
         else
             @assert !haskey(g_progress_states, id)
             g_progress_states[id] = entry
@@ -107,6 +122,27 @@ function _register_progress_impl(description::AbstractString, state::ProgressSta
 end
 
 
-function register_progress(description::AbstractString, state::ProgressState = ProgressState() ; parent::Union{Int,Nothing} = nothing)
-    id, channel = remotecall_fetch(_register_progress_impl, 1, description, state, parent)
+struct ProgressTracker
+    id::Integer
+    channel::Channel{ProgressMessage}
+end
+export ProgressTracker
+
+function ProgressTracker(description::AbstractString, state::ProgressState = ProgressState(); parent::Union{ProgressTracker,Nothing} = nothing)
+    @nospecialize
+    main_process = 1
+    parent_id = isnothing(parent) ? nothing : parent.id
+    ###!!!! ToDo: Direct call if running on main_process:
+    id, channel = remotecall_fetch(_register_progress_impl, main_process, String(description), state, parent_id)
+    ProgressTracker(id, channel)
+end
+
+function Base.close(tracker::ProgressTracker)
+    push!(tracker.channel, ProgressMessage(tracker.id, NaN, time_ns(), true))
+end
+
+Base.push!(tracker::ProgressTracker, progress::Real) = push!(tracker, Float64(progress))
+
+function Base.push!(tracker::ProgressTracker, progress::Float64)
+    push!(tracker.channel, ProgressMessage(tracker.id, Float64(progress), time_ns(), false))
 end
