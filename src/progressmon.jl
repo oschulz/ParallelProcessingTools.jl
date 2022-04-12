@@ -4,7 +4,7 @@
 #!!!! Measure time centrally, not locally
 
 
-#!!!! Allow for multiple ProgressMessage channels that may run on processes
+#!!!! Allow for multiple ProgressReport channels that may run on processes
 # other than number 1, to enable hierarchical data collection schemes
 # on large distributed systems.
 
@@ -12,6 +12,66 @@
 #!!!! New concept: ProgressTrackers reporting to ProgressCollectors, which
 # report to parent ProgressCollectors. Root ProgressCollector(s) produce
 # output via various methods.
+
+
+
+#=
+
+Example:
+
+ProgressReport(depth = 1, op = bat_sample, alg = MCMCSampling, phase = "init", t_start = ..., t_now = ..., progress = ... )
+ProgressReport(depth = 1, op = bat_sample, alg = MCMCSampling, phase = "burn-in", t_start = ..., t_now = ..., progress = ... )
+ProgressReport(depth = 1, op = bat_sample, alg = MCMCSampling, phase = "sampling", t_start = ..., t_now = ..., progress = ... )
+ProgressReport(depth = 1, op = bat_sample, alg = PartitionedSampling, phase = "sampling", t_start = ..., t_now = ..., progress = ... )
+
+Progress(fraction,1:3, 1)  # Phase of algorithm, like init/burn-in/sampling
+Progress(0..1, 0, 1) = Progress(==)
+
+NSteps(n, i)
+MaxNSteps(n, i)
+
+Achieve(<|>|<=|>=, threshold, initial, current)
+Achieve(in, target_interval, initial, current)
+
+Optimize(minimum, initial, current)
+
+=#
+
+
+abstract type AbstractProgress end
+
+Base.@kwdef struct NSteps <: AbstractProgress
+    steps::Int
+    current::Int
+end
+
+Base.@kwdef struct MaxNSteps <: AbstractProgress
+    maxsteps::Int
+    current::Int
+end
+
+Base.@kwdef struct Achieve{F<:Function,T<:Real} <: AbstractProgress
+    comparison::F
+    target::T
+    initial::T
+    current::T
+end
+
+# merge(a::AbstractProgress, b::AbstractProgress)
+
+struct FractionComplete <: AbstractProgress
+    complete::Float64
+end
+
+struct BestWorstProgress{P<:AbstractProgress} <: AbstractProgress
+    best::P
+    worst::P
+end
+
+
+
+
+
 
 
 struct ProgressState
@@ -41,18 +101,6 @@ mutable struct ProgressEntry
 end
 
 
-#!!!! make const
-g_progress_lock = ReentrantLock()
-
-#!!!! use const Ref
-g_progress_channel = nothing
-
-#!!!! make const
-g_progress_states = IdDict{Int,ProgressEntry}()
-
-#!!!! make const
-g_progress_nextid = Atomic{Int}(1)
-
 
 function _individual_progress(state::ProgressState)
     dt = state.t_current - state.t_start
@@ -77,84 +125,57 @@ function _show_progress(d::IdDict{Int,ProgressEntry})
 end
 
 
-struct ProgressMessage
+struct ProgressReport
     id::Int
     progress::Float64
     t_current::UInt64
     done::Bool
 end
 
+struct CloseProgressCollector end
 
-function _progresss_channel_impl(ch::Channel{ProgressMessage})
-    @info "DEBUG: ProgressMessage channel $ch" isopen(ch)
-    #try
-        while true
-            sleep(0.1)
-            try
-                lock(g_progress_lock)
-                if isempty(g_progress_states)
-                    global g_progress_channel = nothing
-                    @info "DEBUG: Closing ProgressMessage channel"
-                    break
-                end
-            finally
-                unlock(g_progress_lock)
-            end
+const ProgressCollectorMsg = Union{ProgressReport,CloseProgressCollector}
 
-            @info "DEBUG: Listening on channel $ch" isopen(ch)
-            msg = take!(ch)
-            @info "DEBUG: Received state from id $(msg.id)"
 
-            try
-                lock(g_progress_lock)
-                if msg.done
-                    # Ignore msg.progress
-                    delete!(g_progress_states, msg.id)
-                else
-                    entry = g_progress_states[msg.id]
-                    entry.state = ProgressState(entry.state, msg.progress, msg.t_current)
-                    _show_progress(g_progress_states)
-                end
-            finally
-                unlock(g_progress_lock)
+function _progresss_collector_impl(progress_dict::IdDict{Int,ProgressEntry}, ch::Channel{ProgressCollectorMsg})
+    @info "DEBUG: ProgressReport channel $ch" isopen(ch)
+    while true
+        @info "DEBUG: Listening on channel $ch" isopen(ch)
+        msg = take!(ch)
+        @info "DEBUG: Received state from id $(msg.id)"
+        if msg isa CloseProgressCollector
+            # empty!(progress_dict) # would this help with GC?
+            break
+        elseif msg isa ProgressReport
+            if msg.done
+                # Ignore msg.progress
+                delete!(g_progress_states, msg.id)
+            else
+                entry = g_progress_states[msg.id]
+                entry.state = ProgressState(entry.state, msg.progress, msg.t_current)
+                _show_progress(g_progress_states)
             end
         end
-    #=!!!!!!!!!!!catch err
-        try
-            lock(g_progress_lock)
-            empty!(g_progress_states)
-            global g_progress_channel = nothing
-        finally
-            unlock(g_progress_lock)
-        end
-    end=#
-end
-
-
-function _register_progress_impl(description::AbstractString, state::ProgressState, parent::Union{Int,Nothing})
-    try
-        global g_progress_channel
-        lock(g_progress_lock)
-        id = atomic_add!(g_progress_nextid, 1)
-        entry = ProgressEntry(id, parent, description, state)
-        if isnothing(g_progress_channel) || !isopen(g_progress_channel)
-            @assert isempty(g_progress_states)
-            g_progress_states[id] = entry
-            g_progress_channel = Channel{ProgressMessage}(100) #!!!!!!!!!!!!! Channel{ProgressMessage}(_progresss_channel_impl, 1000, spawn = true)
-        else
-            @assert !haskey(g_progress_states, id)
-            g_progress_states[id] = entry
-        end
-        id, g_progress_channel
-    finally
-        unlock(g_progress_lock)
     end
 end
 
 
+struct ProgressCollector
+    parent::Union{ProgressCollector,Nothing}
+    channel::Channel{ProgressCollectorMsg}
+end
+export ProgressCollector
+
+function ProgressCollector(parent::ProgressCollector)
+    progress_dict = IdDict{Int,ProgressEntry}()
+    channel = Channel{ProgressCollectorMsg}(Base.Fix1(_progresss_collector_impl, progress_dict))
+    ProgressCollector(parent, channel)
+end
+
+
 struct ProgressTracker
-    id::Integer
-    channel::Channel{ProgressMessage}
+    parent::ProgressCollector
+    channel::Channel{ProgressCollectorMsg}
 end
 export ProgressTracker
 
@@ -170,7 +191,7 @@ end
 
 function Base.close(tracker::ProgressTracker)
     @info "DEBUG: Sending to $(tracker.channel)" isopen(tracker.channel)
-    push!(tracker.channel, ProgressMessage(tracker.id, NaN, time_ns(), true))
+    push!(tracker.channel, ProgressReport(tracker.id, NaN, time_ns(), true))
     @info "DEBUG: Sent to $(tracker.channel)" isopen(tracker.channel)
 end
 
@@ -178,6 +199,6 @@ Base.push!(tracker::ProgressTracker, progress::Real) = push!(tracker, Float64(pr
 
 function Base.push!(tracker::ProgressTracker, progress::Float64)
     @info "DEBUG: Sending to $(tracker.channel)" isopen(tracker.channel)
-    push!(tracker.channel, ProgressMessage(tracker.id, Float64(progress), time_ns(), false))
+    push!(tracker.channel, ProgressReport(tracker.id, Float64(progress), time_ns(), false))
     @info "DEBUG: Sent to $(tracker.channel)" isopen(tracker.channel)
 end
