@@ -6,6 +6,7 @@ module ParallelProcessingTools
 
 using Base.Threads
 using Distributed
+using UUIDs
 
 include("threadsafe.jl")
 include("threadlocal.jl")

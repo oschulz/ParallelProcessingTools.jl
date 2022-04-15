@@ -38,38 +38,55 @@ Optimize(minimum, initial, current)
 =#
 
 
-abstract type AbstractProgress end
+abstract type AbstractProgressTarget{T<:Real} end
 
-Base.@kwdef struct NSteps <: AbstractProgress
-    steps::Int
-    current::Int
+abstract type AbstractProgressState end
+
+abstract type AbstractProgressCollector end
+
+
+Base.@kwdef struct MinStepsProgress <: AbstractProgressTarget{Int}
+    minsteps::Int
 end
 
-Base.@kwdef struct MaxNSteps <: AbstractProgress
+Base.@kwdef struct MaxStepsProgress <: AbstractProgressTarget{Int}
     maxsteps::Int
-    current::Int
 end
 
-Base.@kwdef struct Achieve{F<:Function,T<:Real} <: AbstractProgress
+Base.@kwdef struct TargetValueProgress{F<:Function,T<:Real} <: AbstractProgressTarget{T}
     comparison::F
     target::T
-    initial::T
-    current::T
 end
 
-# merge(a::AbstractProgress, b::AbstractProgress)
 
-struct FractionComplete <: AbstractProgress
+
+struct SingleProgressState{T<:Real,P<:AbstractProgressTarget{T}} <: AbstractProgressState
+    target::P
+    current::T
+    t_elapsed::Float64
+end
+
+
+struct ProgressTracker{S<:SingleProgressState,C<:AbstractProgressCollector}
+    id::UUID
+    state::S
+    collector::C
+end
+
+
+
+
+# merge(a::AbstractProgressTarget, b::AbstractProgressTarget)
+
+struct CompletionProgress <: AbstractProgressTarget
     complete::Float64
 end
 
-struct BestWorstProgress{P<:AbstractProgress} <: AbstractProgress
-    best::P
-    worst::P
+
+
+struct CollectedProgress{T} <: AbstractProgressTarget
+    entries::IdDict{UUID,T}
 end
-
-
-
 
 
 

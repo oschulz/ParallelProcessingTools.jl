@@ -4,6 +4,7 @@ version = "0.4.3"
 
 [deps]
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
+UUIDs = "cf7118a7-6976-5b1a-9a39-7adc72f591a4"
 
 [compat]
 julia = "1"
