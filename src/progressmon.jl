@@ -37,10 +37,19 @@ Optimize(minimum, initial, current)
 
 =#
 
+const RealNTuple = NTuple{N<:Real} where N
 
-abstract type AbstractProgressTarget{T<:Real} end
+abstract type AbstractProgressTarget end
+
+abstract type LocalProgressTarget{T<:Union{Real,RealNTuple}} <: AbstractProgressTarget end
+
+abstract type SingleProgressTarget{T<:Real} <: LocalProgressTarget{T} end
+
 
 abstract type AbstractProgressState end
+
+abstract type AbstractProgressUpdate end
+
 
 abstract type AbstractProgressTracker end
 
@@ -71,30 +80,63 @@ struct SingleProgressState{T<:Real,P<:AbstractProgressTarget{T}} <: AbstractProg
     id::UUID
     target::P
     v_start::T
-    v_current::T
     t_start_ns::UInt64
+    v_current::T
     t_current_ns::UInt64
     last_update::Float64
 end
 
-function update_progress_state!!(state::SingleProgressState{T}, v_current, t_current_ns::UInt64 == time_s(), last_update::Float64 == time())
-    SingleProgressState{T}(state.id, state.target, t.v_start, convert(T, v_current), state.t_start_ns, t_current_ns, last_update)
-end
-
-
-
-struct CollectedProgressState{S<:AbstractProgressState} <: AbstractProgressState
-    entries::IdDict{UUID,S}
-    t_start_ns::UInt64
+struct SingleProgressUpdate{T} <: AbstractProgressUpdate
+    id::UUID
+    v::T
     t_current_ns::UInt64
     timestamp::Float64
 end
 
-function update_progress_state!!(state::CollectedProgressState, new_entry::AbstractProgressState, t_current_ns::UInt64 == time_s(), last_update::Float64 == time())
-    state.entries[new_entry.id] == new_entry
-    state.diff[new_entry.id] == new_entry
-    CollectedProgressState(state.entries, state.t_start_ns, t_current_ns, last_update)
+function update_progress_state!!(state::SingleProgressState{T}, update::SingleProgressUpdate{T}) where T
+    state.id === update.id || throw(ArgumentError("Can't update progress state with update from different tracker id"))
+    SingleProgressState{T}(
+        state.id, state.target, state.v_start, state.t_start_ns,
+        update.v_current, update.t_current_ns, update.timestamp
+    )
 end
+
+
+
+struct MultiProgressState{S<:AbstractProgressState} <: AbstractProgressState
+    id::UUID
+    t_start_ns::UInt64
+    v_current::IdDict{UUID,S}
+    t_current_ns::UInt64
+    last_update::Float64
+end
+
+struct MultiProgressUpdate{S<:AbstractProgressUpdate} <: AbstractProgressUpdate
+    entries::IdDict{UUID,S}
+    t_current_ns::UInt64
+    timestamp::Float64
+end
+
+
+function update_progress_state!!(state::MultiProgressState{S}, update::SingleProgressUpdate) where S
+    state.v_current[update.id] = update_progress_state!!(state.v_current[update.id], update.v)
+    MultiProgressState(
+        state.id, state.t_start_ns,
+        state.v_current, update.t_current_ns, update.timestamp
+    )
+end
+
+
+function update_progress_state!!(state::MultiProgressState, update::MultiProgressUpdate)
+    for (id, v) in update
+        state.v_current[id] = update_progress_state!!(state.v_current[id], v)
+    end
+    MultiProgressState(
+        state.id, state.t_start_ns,
+        state.v_current, update.t_current_ns, update.timestamp
+    )
+end
+
 
 
 
