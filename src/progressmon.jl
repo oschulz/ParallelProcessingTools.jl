@@ -42,6 +42,8 @@ abstract type AbstractProgressTarget{T<:Real} end
 
 abstract type AbstractProgressState end
 
+abstract type AbstractProgressTracker end
+
 abstract type AbstractProgressCollector end
 
 
@@ -59,21 +61,72 @@ Base.@kwdef struct TargetValueProgress{F<:Function,T<:Real} <: AbstractProgressT
 end
 
 
+struct ComposedProgressTarget{N,T<:NTuple{N,<:Real}, PT<:NTuple{N,AbstractProgressTarget}} <: AbstractProgressTarget{T}
+    targets::PT
+end
+
+
 
 struct SingleProgressState{T<:Real,P<:AbstractProgressTarget{T}} <: AbstractProgressState
-    target::P
-    current::T
-    t_elapsed::Float64
-end
-
-
-struct ProgressTracker{S<:SingleProgressState,C<:AbstractProgressCollector}
     id::UUID
-    state::S
-    collector::C
+    target::P
+    v_start::T
+    v_current::T
+    t_start_ns::UInt64
+    t_current_ns::UInt64
+    last_update::Float64
+end
+
+function update_progress_state!!(state::SingleProgressState{T}, v_current, t_current_ns::UInt64 == time_s(), last_update::Float64 == time())
+    SingleProgressState{T}(state.id, state.target, t.v_start, convert(T, v_current), state.t_start_ns, t_current_ns, last_update)
 end
 
 
+
+struct CollectedProgressState{S<:AbstractProgressState} <: AbstractProgressState
+    entries::IdDict{UUID,S}
+    t_start_ns::UInt64
+    t_current_ns::UInt64
+    timestamp::Float64
+end
+
+function update_progress_state!!(state::CollectedProgressState, new_entry::AbstractProgressState, t_current_ns::UInt64 == time_s(), last_update::Float64 == time())
+    state.entries[new_entry.id] == new_entry
+    state.diff[new_entry.id] == new_entry
+    CollectedProgressState(state.entries, state.t_start_ns, t_current_ns, last_update)
+end
+
+
+
+
+struct ProgressTracker{S<:AbstractProgressState,P<:AbstractProgressTracker}
+    id::UUID
+    collector::C
+    state::Ref{S}
+end
+
+
+function Base.push!(tracker::ProgressTracker, current)
+    timestamp, t_current_ns = time(), time_ns()
+    tracker.state[] = update_progress_state!!(tracker.state, current, t_current_ns)
+    push!(tracker.collector, ProgessReport(tracker.id, tracker.state[]), timestamp)
+end
+
+
+struct PCEntry{S<:AbstractProgressState}
+    state::S
+    last_update::Float64
+end
+
+
+
+
+function Base.push!(state::CollectedProgressState, report::ProgressReport)
+    t_recv =
+    if haskey(states, report.id)
+        states[report.id] = report.state
+    end
+end
 
 
 # merge(a::AbstractProgressTarget, b::AbstractProgressTarget)
