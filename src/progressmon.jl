@@ -1,7 +1,13 @@
 # This file is a part of ParallelProcessingTools.jl, licensed under the MIT License (MIT).
 
 
-#!!!! Measure time centrally, not locally
+#!!!! Generalize: Add concept of algorithmic task, also track CPU time used, etc.,
+# in addition to progress targets. Hierarchy of such tasks, mirroring hierarchy
+# of Julia tasks (not necessarily perfectly).
+
+#!!!! Use ContextVariablesX.jl
+
+#!!!! Measure time centrally as well as locally?
 
 
 #!!!! Allow for multiple ProgressReport channels that may run on processes
