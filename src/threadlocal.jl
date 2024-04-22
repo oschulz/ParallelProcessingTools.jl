@@ -124,13 +124,5 @@ Base.get!(x::ThreadLocal, default) = get!(() -> default, x)
 Base.isassigned(x::ThreadLocal) = isassigned(x.value, threadid())
 
 function getallvalues(x::ThreadLocal)
-    @static if VERSION >= v"1.3.0-alpha.0"
-        x.value
-    else
-        if !Base.Threads.in_threaded_loop[]
-            x.value
-        else
-            throw(InvalidStateException("Can not access thread local values across threads in multi-threaded code sections"))
-        end
-    end
+    x.value
 end

@@ -6,39 +6,7 @@ abstract type ThreadSafe{T} end
 
 
 export ThreadSafeReentrantLock
-
-@static if VERSION >= v"1.2-DEV.28"
-    const ThreadSafeReentrantLock = ReentrantLock
-else
-    struct ThreadSafeReentrantLock
-        thread_lock::RecursiveSpinLock
-        task_lock::ReentrantLock
-
-        ThreadSafeReentrantLock() = new(RecursiveSpinLock(), ReentrantLock())
-    end
-
-    function Base.lock(l::ThreadSafeReentrantLock)
-        # @debug "LOCKING $l"
-        lock(l.thread_lock)
-        try
-            lock(l.task_lock)
-        catch err
-            unlock(l.thread_lock)
-            rethrow()
-        end
-    end
-
-
-    function Base.unlock(l::ThreadSafeReentrantLock)
-        # @debug "UNLOCKING $l"
-        try
-            unlock(l.task_lock)
-        finally
-            unlock(l.thread_lock)
-        end
-    end
-end
-
+const ThreadSafeReentrantLock = ReentrantLock
 
 
 export LockableValue
