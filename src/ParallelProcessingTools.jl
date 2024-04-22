@@ -7,6 +7,9 @@ module ParallelProcessingTools
 using Base.Threads
 using Distributed
 
+import ClusterManagers
+import ThreadPinning
+
 include("threadsafe.jl")
 include("threadlocal.jl")
 include("onthreads.jl")
