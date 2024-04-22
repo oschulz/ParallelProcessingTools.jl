@@ -7,6 +7,9 @@ module ParallelProcessingTools
 using Base.Threads
 using Distributed
 
+import LinearAlgebra
+import Pkg
+
 import ClusterManagers
 import ThreadPinning
 
