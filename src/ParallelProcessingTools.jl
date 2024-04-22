@@ -14,13 +14,14 @@ import ClusterManagers
 import ThreadPinning
 
 using Parameters: @with_kw
-using Unpack: @unpack
 
 include("threadsafe.jl")
 include("threadlocal.jl")
 include("onthreads.jl")
 include("onprocs.jl")
 include("workpartition.jl")
+include("workers.jl")
+include("slurm.jl")
 include("deprecated.jl")
 
 end # module
