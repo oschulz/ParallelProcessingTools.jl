@@ -12,5 +12,6 @@ include("threadlocal.jl")
 include("onthreads.jl")
 include("onprocs.jl")
 include("workpartition.jl")
+include("deprecated.jl")
 
 end # module

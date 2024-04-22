@@ -178,15 +178,6 @@ end
 export @onthreads
 
 
-macro onallthreads(expr)
-    quote
-        Base.depwarn("`@onallthreads expr` is deprecated, use `@onthreads allthreads() expr` instead.", nothing)
-        $(_thread_exec_func(:(ParallelProcessingTools.allthreads()), expr))
-    end
-end
-export @onallthreads
-
-
 function ThreadLocal{T}(f::Base.Callable) where {T}
     result = ThreadLocal{T}(undef)
     result.value
@@ -195,34 +186,6 @@ function ThreadLocal{T}(f::Base.Callable) where {T}
 end
 
 
-"""
-    @mt_async expr
-
-Spawn a Julia task running `expr` asynchronously.
-
-Compatible with `@sync`. Uses a multi-threaded task scheduler if available (on
-Julia >= v1.3).
-
-Equivalent to `Base.@async` on Julia <= v1.2, equivalent to
-`Base.Threads.@spawn` on Julia >= v1.3.
-"""
-macro mt_async(expr)
-    # Code taken from Base.@async and Base.Threads.@spawn:
-    thunk = esc(:(()->($expr)))
-    var = esc(Base.sync_varname)
-    quote
-        local task = Task($thunk)
-        @static if VERSION >= v"1.3.0-alpha.0"
-            task.sticky = false
-        end
-        if $(Expr(:isdefined, var))
-            push!($var, task)
-        end
-        schedule(task)
-        task
-    end
-end
-export @mt_async
 
 
 """
@@ -257,14 +220,14 @@ macro mt_out_of_order(ex)
             trg = exprs[i].args[1]
             val = exprs[i].args[2]
             if val isa Expr
-                exprs[i] = :(push!($tasks, @mt_async($(esc(val)))))
+                exprs[i] = :(push!($tasks, Base.Threads.@spawn($(esc(val)))))
                 push!(handle_results, :($(esc(trg)) = fetch(popfirst!($tasks))))
             else
                 exprs[i] = esc(exprs[i])
             end
         elseif exprs[i] isa Expr
             ftvar = gensym()
-            exprs[i] = :(push!($tasks, @mt_async($(esc(exprs[i])))))
+            exprs[i] = :(push!($tasks, Base.Threads.@spawn($(esc(exprs[i])))))
             push!(handle_results, :(wait(popfirst!($tasks))))
         else
             exprs[i] = esc(exprs[i])

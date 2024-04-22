@@ -35,19 +35,6 @@ using Base.Threads
         end) == 1:nthreads()
     end
 
-    @testset "macro mt_async" begin
-        @test begin
-            n = 128
-            A = zeros(n)
-            @sync for i in eachindex(A)
-                @mt_async begin
-                    do_work(10^3)
-                    A[i] = log(i)
-                end
-            end
-            A == log.(1:n)
-        end
-    end
 
     @testset "macro mt_out_of_order" begin
         @test begin

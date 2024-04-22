@@ -21,9 +21,6 @@ abstract type AbstractThreadLocal{T} end
 export AbstractThreadLocal
 
 
-@deprecate isdefined_local(x) isassigned(x)
-
-
 """
     getlocalvalue(x::Any) = x
     getlocalvalue(x::ThreadLocal) = x[]
