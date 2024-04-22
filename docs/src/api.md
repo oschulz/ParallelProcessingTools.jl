@@ -1,15 +1,15 @@
 # API
 
-```@meta
-DocTestSetup  = quote
-    using ParallelProcessingTools
-end
-```
-
-## Types
+## Modules
 
 ```@index
-Order = [:type]
+Order = [:module]
+```
+
+## Types and constants
+
+```@index
+Order = [:type, :constant]
 ```
 
 ## Functions and macros
@@ -22,5 +22,5 @@ Order = [:macro, :function]
 
 ```@autodocs
 Modules = [ParallelProcessingTools]
-Order = [:type, :macro, :function]
+Order = [:module, :type, :constant, :macro, :function]
 ```

@@ -7,6 +7,14 @@
 using Documenter
 using ParallelProcessingTools
 
+# Doctest setup
+DocMeta.setdocmeta!(
+    ParallelProcessingTools,
+    :DocTestSetup,
+    :(using ParallelProcessingTools);
+    recursive=true,
+)
+
 makedocs(
     sitename = "ParallelProcessingTools",
     modules = [ParallelProcessingTools],
@@ -20,8 +28,8 @@ makedocs(
         "LICENSE" => "LICENSE.md",
     ],
     doctest = ("fixdoctests" in ARGS) ? :fix : true,
-    linkcheck = ("linkcheck" in ARGS),
-    strict = !("nonstrict" in ARGS),
+    linkcheck = !("nonstrict" in ARGS),
+    warnonly = ("nonstrict" in ARGS),
 )
 
 deploydocs(
