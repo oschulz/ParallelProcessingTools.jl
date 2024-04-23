@@ -20,7 +20,7 @@ include("threadlocal.jl")
 include("onthreads.jl")
 include("onprocs.jl")
 include("workpartition.jl")
-include("workers.jl")
+include("addworkers.jl")
 include("slurm.jl")
 include("deprecated.jl")
 
