@@ -17,6 +17,7 @@ using Logging: @logmsg, LogLevel, Info, Debug
 
 using Parameters: @with_kw
 
+include("exceptions.jl")
 include("fileio.jl")
 include("threadsafe.jl")
 include("threadlocal.jl")
