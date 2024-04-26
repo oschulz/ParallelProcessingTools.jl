@@ -8,7 +8,6 @@ using ParallelProcessingTools: split_basename_ext, tmp_filename
 old_julia_debug = get(ENV, "JULIA_DEBUG", "")
 ENV["JULIA_DEBUG"] = old_julia_debug * ",ParallelProcessingTools"
 
-
 @testset "fileio" begin
     @testset "split_basename_ext" begin
         @test @inferred(split_basename_ext("foo_bar baz.tar.gz")) == ("foo_bar baz", ".tar.gz")
@@ -38,7 +37,7 @@ ENV["JULIA_DEBUG"] = old_julia_debug * ",ParallelProcessingTools"
     end
 
     for use_cache in [false, true]
-        @testset "create_files" begin
+        @testset "create_files $(use_cache ? "with" : "without") cache" begin
             mktempdir() do dir
                 data1 = "Hello"
                 data2 = "World"
@@ -85,6 +84,31 @@ ENV["JULIA_DEBUG"] = old_julia_debug * ",ParallelProcessingTools"
                     write(fn1, data1); write(fn2, data2)
                 end
                 @test read(fn1, String) == data1 && read(fn2, String) == data2
+            end
+        end
+    end
+
+    for use_cache in [false, true]
+        @testset "read_files $(use_cache ? "with" : "without") cache" begin
+            mktempdir() do dir
+                data1 = "Hello"
+                data2 = "World"
+
+                fn1 = joinpath(dir, "targetdir", "hello.txt")
+                fn2 = joinpath(dir, "targetdir", "world.txt")
+
+                mkpath(dirname(fn1)); mkpath(dirname(fn2))
+                write(fn1, data1); write(fn2, data2)
+
+                @test_throws ErrorException read_files(
+                    (fn1, fn2) -> (read(fn1, String), read(fn2, String)),
+                    fn1, "nosuchfile.txt", use_cache = use_cache, verbose = true
+                )
+
+                @test @inferred(read_files(
+                    (fn1, fn2) -> (read(fn1, String), read(fn2, String)),
+                    fn1, fn2, use_cache = use_cache, verbose = true
+                )) == (data1, data2)
             end
         end
     end

@@ -48,8 +48,9 @@ _rand_fname_tag() = String(rand(b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJ
 """
     function create_files(
         f_write, filenames::AbstractString...;
-        create_dirs::Bool = true, overwrite::Bool = true, delete_on_error::Bool=true,
+        overwrite::Bool = true,
         use_cache::Bool = false, cache_dir::AbstractString = tempdir(),
+        create_dirs::Bool = true, delete_tmp_onerror::Bool=true,
         verbose::Bool = true
     )
 
@@ -59,7 +60,7 @@ Creates `filenames` in an atomic fashion via a user-provided function
 Using temporary filenames, calls `f_write(temporary_filenames...)`. If
 `f_write` doesn't throw an exception, the files `temporary_filenames` are
 renamed to `filenames`. If `f_write` throws an exception, the temporary files
-are either deleted (if `delete_on_error` is `true`) or left in place (e.g. for
+are either deleted (if `delete_tmp_onerror` is `true`) or left in place (e.g. for
 debugging purposes).
 
 If `create_dirs` is `true`, the `temporary_filenames` are created in
@@ -96,16 +97,18 @@ the default Linux RAM disk as an intermediate directory.
 """
 function create_files(
     @nospecialize(f_write), @nospecialize(filenames::AbstractString...);
-    create_dirs::Bool = true, overwrite::Bool = true, delete_on_error::Bool=true,
+    overwrite::Bool = true,
     use_cache::Bool = false, cache_dir::AbstractString = tempdir(),
+    create_dirs::Bool = true, delete_tmp_onerror::Bool=true,
     verbose::Bool = true
 )
     loglevel = verbose ? Info : Debug
 
     target_fnames = String[filenames...] # Fix type
     staging_fnames = String[]
-    writeto_fnames = String[]
-    completed_fnames = String[]
+    cache_fnames = String[]
+    move_complete = similar(target_fnames, Bool)
+    fill!(move_complete, false)
 
     pre_existing = isfile.(target_fnames)
     if any(pre_existing)
@@ -124,23 +127,26 @@ function create_files(
         for dir in dirs
             if !isdir(dir) && create_dirs
                 mkpath(dir)
-                @logmsg loglevel "Created directory $dir."
+                @logmsg loglevel "Created output directory $dir."
             end
         end
 
         if use_cache && !isdir(cache_dir)
             mkpath(cache_dir)
-            @logmsg loglevel "Created cache directory $cache_dir."
+            @logmsg loglevel "Created write-cache directory $cache_dir."
         end
     end
 
     try
-        staging_fnames = tmp_filename.(target_fnames)
+        if use_cache
+            append!(cache_fnames, tmp_filename.(target_fnames, Ref(cache_dir)))
+            @assert !any(isfile, cache_fnames)
+        end
+
+        append!(staging_fnames, tmp_filename.(target_fnames))
         @assert !any(isfile, staging_fnames)
 
-        writeto_fnames = use_cache ? tmp_filename.(target_fnames, Ref(cache_dir)) : staging_fnames
-        @assert !any(isfile, writeto_fnames)
-
+        writeto_fnames = use_cache ? cache_fnames : staging_fnames
         @debug "Creating intermediate files $writeto_fnames."
         f_write(writeto_fnames...)
 
@@ -158,41 +164,58 @@ function create_files(
 
         try
             if use_cache
-                for (writeto_fn, staging_fn) in zip(writeto_fnames, staging_fnames)
-                    @assert writeto_fn != staging_fn
-                    @debug "Moving file \"$writeto_fn\" to \"$staging_fn\"."
-                    isfile(writeto_fn) || error("Expected file \"$writeto_fn\" to exist, but it doesn't.")
-                    mv(writeto_fn, staging_fn; force=true)
-                    isfile(staging_fn) || error("Tried to move file \"$writeto_fn\" to \"$staging_fn\", but \"$staging_fn\" doesn't exist.")
+                @userfriendly_exceptions @sync for (cache_fn, staging_fn) in zip(cache_fnames, staging_fnames)
+                    Threads.@spawn begin
+                        @assert cache_fn != staging_fn
+                        @debug "Moving file \"$cache_fn\" to \"$staging_fn\"."
+                        isfile(cache_fn) || error("Expected file \"$cache_fn\" to exist, but it doesn't.")
+                        mv(cache_fn, staging_fn; force=true)
+                    end
+                end
+                empty!(cache_fnames)
+            end
+
+            @userfriendly_exceptions @sync for i in eachindex(staging_fnames, target_fnames)
+                Threads.@spawn begin
+                    staging_fn = staging_fnames[i]
+                    target_fn = target_fnames[i]
+                    @assert staging_fn != target_fn
+                    @debug "Renaming file \"$staging_fn\" to \"$target_fn\"."
+                    isfile(staging_fn) || error("Expected file \"$staging_fn\" to exist, but it doesn't.")
+                    mv(staging_fn, target_fn; force=true)
+                    isfile(target_fn) || error("Tried to rename file \"$staging_fn\" to \"$target_fn\", but \"$target_fn\" doesn't exist.")
+                    move_complete[i] = true
                 end
             end
-            for (staging_fn, target_fn) in zip(staging_fnames, target_fnames)
-                @assert staging_fn != target_fn
-                @debug "Renaming file \"$staging_fn\" to \"$target_fn\"."
-                isfile(staging_fn) || error("Expected file \"$staging_fn\" to exist, but it doesn't.")
-                mv(staging_fn, target_fn; force=true)
-                isfile(target_fn) || error("Tried to rename file \"$staging_fn\" to \"$target_fn\", but \"$target_fn\" doesn't exist.")
-                push!(completed_fnames, target_fn)
-            end
+            empty!(staging_fnames)
+
             @logmsg loglevel "Created files $target_fnames."
         catch
-            if !isempty(completed_fnames)
-                @error "Failed to rename some temporary files to final filenames, removing $completed_fnames"
-                for fname in completed_fnames
+            if any(move_complete) && !all(move_complete)
+                to_remove = target_fnames[findall(move_complete)]
+                @error "Failed to rename some of the temporary files to target files, removing $to_remove"
+                for fname in to_remove
                     rm(fname; force=true)
                 end
             end
             rethrow()
         end
 
-        @assert all(fn -> !isfile(fn), staging_fnames)
+        @assert isempty(cache_fnames)
+        @assert isempty(staging_fnames)
     finally
-        if delete_on_error
-            for writeto_fn in writeto_fnames
-                isfile(writeto_fn) && rm(writeto_fn; force=true);
+        if delete_tmp_onerror
+            for cache_fn in cache_fnames
+                if isfile(cache_fn)
+                    @debug "Removing left-over write-cache file \"$cache_fn\"."
+                    rm(cache_fn; force=true)
+                end
             end
             for staging_fn in staging_fnames
-                isfile(staging_fn) && rm(staging_fn; force=true);
+                if isfile(staging_fn)
+                    @debug "Removing left-over write-staging file \"$staging_fn\"."
+                    rm(staging_fn; force=true)
+                end
             end
         end
     end
@@ -200,3 +223,102 @@ function create_files(
     return nothing
 end
 export create_files
+
+
+"""
+    function read_files(
+        f_read, filenames::AbstractString...;
+        use_cache::Bool = true, cache_dir::AbstractString = tempdir(),
+        create_cachedir::Bool = true, delete_tmp_onerror::Bool=true,
+        verbose::Bool = true
+    )
+
+Reads `filenames` in an atomic fashion (i.e. only if all `filenames` exist)
+via a user-provided function `f_read`. The returns value of `f_read` is
+passed through.
+
+If `use_cache` is `true`, then the files are first copied to the
+temporary directory `cache_dir` under temporary names, and
+`f_read(temporary_filenames...)` is called. The temporary files are deleted
+afterwards.
+
+If `create_cachedir` is `true`, then `cache_dir` will be created if it doesn't
+exist yet. If `delete_tmp_onerror` is true, then temporary files are
+deleted even if `f_write` throws an exception.
+
+If `verbose` is `true`, uses log-level `Logging.Info` to log file reading,
+otherwise `Logging.Debug`.
+
+```julia
+write("foo.txt", "Hello"); write("bar.txt", "World")
+
+read_files("foo.txt", "bar.txt", use_cache = true) do foo, bar
+    read(foo, String) * " " * read(bar, String)
+end
+```
+
+Set `ENV["JULIA_DEBUG"] = "ParallelProcessingTools"` to see a log of all
+intermediate steps.
+
+On Linux you can set `use_cache = true` and `cache_dir = "/dev/shm"` to use
+the default Linux RAM disk as an intermediate directory.
+"""
+function read_files(
+    @nospecialize(f_read), @nospecialize(filenames::AbstractString...);
+    use_cache::Bool = true, cache_dir::AbstractString = tempdir(),
+    create_cachedir::Bool = true, delete_tmp_onerror::Bool=true,
+    verbose::Bool = true
+)
+    loglevel = verbose ? Info : Debug
+
+    source_fnames = String[filenames...] # Fix type
+    cache_fnames = String[]
+
+    input_exists = isfile.(source_fnames)
+    if !all(input_exists)
+        missing_inputs = source_fnames[findall(!, input_exists)]
+        throw(ErrorException("Missing input files $(missing_inputs)."))
+    end
+
+    try
+        if use_cache
+            if !isdir(cache_dir) && create_cachedir
+                mkpath(cache_dir)
+                @logmsg loglevel "Created read-cache directory $cache_dir."
+            end
+
+            append!(cache_fnames, tmp_filename.(source_fnames, Ref(cache_dir)))
+            @assert !any(isfile, cache_fnames)
+
+            @userfriendly_exceptions @sync for (cache_fn, source_fn) in zip(cache_fnames, source_fnames)
+                Threads.@spawn begin
+                    @assert cache_fn != source_fn
+                    @debug "Copying file \"$source_fn\" to \"$cache_fn\"."
+                    cp(source_fn, cache_fn)
+                    isfile(cache_fn) || error("Tried to copy file \"$source_fn\" to \"$cache_fn\", but \"$cache_fn\" doesn't exist.")
+                end
+            end
+        end
+
+        readfrom_fnames = use_cache ? cache_fnames : source_fnames
+
+        @debug "Reading $(use_cache ? "cached " : "")files $readfrom_fnames."
+        result = f_read(readfrom_fnames...)
+        @logmsg loglevel "Read files $source_fnames."
+
+        @userfriendly_exceptions @sync for cache_fn in cache_fnames
+            Threads.@spawn rm(cache_fn; force=true);
+        end
+        return result
+    finally
+        if delete_tmp_onerror
+            for cache_fn in cache_fnames
+                if isfile(cache_fn)
+                    @debug "Removing left-over read-cache file \"$cache_fn\"."
+                    rm(cache_fn; force=true)
+                end
+            end
+        end
+    end
+end
+export read_files
