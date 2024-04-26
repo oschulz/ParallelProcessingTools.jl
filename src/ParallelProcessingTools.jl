@@ -15,6 +15,7 @@ import ThreadPinning
 
 using Parameters: @with_kw
 
+include("fileio.jl")
 include("threadsafe.jl")
 include("threadlocal.jl")
 include("onthreads.jl")
