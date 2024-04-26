@@ -13,6 +13,8 @@ import Pkg
 import ClusterManagers
 import ThreadPinning
 
+using Logging: @logmsg, LogLevel, Info, Debug
+
 using Parameters: @with_kw
 
 include("fileio.jl")
