@@ -24,7 +24,7 @@ using Base.Threads
 
     @testset "LockableIO" begin
         lv = @inferred LockableIO(IOBuffer())
-        @test typeof(lv) <: LockableIO{Base.Base.GenericIOBuffer{Array{UInt8,1}}}
+        @test typeof(lv) <: LockableIO{typeof(IOBuffer())}
         
         f = s -> write(s, 10)
         broadcast(f, lv)
