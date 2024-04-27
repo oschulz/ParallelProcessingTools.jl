@@ -93,11 +93,12 @@ function ParallelProcessingTools.start_elastic_workers(mode::SlurmRun, manager::
     srun_cmd, n_workers = worker_start_command(mode, manager)
     if mode.user_start
         @info "To add Julia worker processes (I'll wait for them), run: $srun_cmd"
+        return n_workers, missing
     else
         @info "Starting SLURM job: $srun_cmd"
         srun_proc = open(srun_cmd)
+        return n_workers, srun_proc
     end
-    return n_workers
 end
 
 function worker_init_code(::SlurmRun)

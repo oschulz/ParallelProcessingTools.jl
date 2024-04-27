@@ -372,8 +372,14 @@ elastic_addprocs_timeout(mode::ElasticAddProcsMode) = 60
 """
     ParallelProcessingTools.start_elastic_workers(mode::ElasticAddProcsMode, manager::ClusterManagers.ElasticManager)::Int
 
-Spawn worker processes as specified by `mode` and return the number of
-expected additional workers.
+Spawn worker processes as specified by `mode` and return a tuple `n, state`.
+
+`n` is the number of expected additional workers.
+
+`state` is be some object that can be monitored, or `missing`. `state` may be
+a `Task`, `Process` or any other object that supports
+`ParallelProcessingTools.isactive(state)` and
+`ParallelProcessingTools.throw_if_failed(state)`
 """
 function start_elastic_workers end
 
@@ -386,7 +392,7 @@ function addworkers(mode::ElasticAddProcsMode)
 
         old_procs = Distributed.procs()
         n_previous = length(old_procs)
-        n_to_add = start_elastic_workers(mode, manager)
+        n_to_add, start_state = start_elastic_workers(mode, manager)
 
         @info "Waiting for $n_to_add workers to connect..."
     
@@ -402,6 +408,17 @@ function addworkers(mode::ElasticAddProcsMode)
         t_waited = zero(t_start)
         n_added_last = 0
         while true
+            if !isactive(start_state)
+                label = getlabel(start_state)
+                if hasfailed(start_state)
+                    err = whyfailed(start_state)
+                    error("Aborting addworkers, $label failed due to $err")
+                else
+                    error("Aborting addworkers, $label doesn't seem to have failed but seems to have terminated")
+                end
+                break
+            end
+
             t_waited = time() - t_start
             if t_waited > timeout
                 @error "Timeout after waiting for workers to connect for $t_waited seconds"
@@ -477,7 +494,7 @@ end
 function start_elastic_workers(mode::ExternalProcesses, manager::ClusterManagers.ElasticManager)
     start_cmd, n_workers = worker_start_command(mode, manager)
     @info "To add Julia worker processes, run ($n_workers times in parallel, I'll wait for them): $start_cmd"
-    return n_workers
+    return n_workers, missing
 end
 
 
