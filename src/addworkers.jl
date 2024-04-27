@@ -221,6 +221,7 @@ function addworkers(mode::LocalProcesses)
         @info "Configuring $n_workers new Julia worker processes"
 
         _run_always_everywhere_code(new_workers, pre_always = worker_init_code(mode))
+        _maybe_add_workers_to_scheduler(new_workers)
 
         # Sanity check:
         worker_ids = Distributed.remotecall_fetch.(Ref(Distributed.myid), Distributed.workers())
@@ -414,6 +415,7 @@ function addworkers(mode::ElasticAddProcsMode)
 
         @info "Initializing $n_new new Julia worker processes"
         _run_always_everywhere_code(new_workers, pre_always = worker_init_code(mode))
+        _maybe_add_workers_to_scheduler(new_workers)
 
         @info "Added $n_new new Julia worker processes"
 
@@ -464,4 +466,59 @@ function start_elastic_workers(mode::ExternalProcesses, manager::ClusterManagers
     start_cmd, n_workers = worker_start_command(mode, manager)
     @info "To add Julia worker processes, run ($n_workers times in parallel, I'll wait for them): $start_cmd"
     return n_workers
+end
+
+
+"""
+    killworkers(worker::Integer)
+    killworkers(workers::AbstractVector{<:Integer})
+
+Kill one or more worker processes.
+"""
+function killworkers end
+export killworkers
+
+function killworkers(workers::Union{Integer,AbstractVector{<:Integer}})
+    main_process = Distributed.myid()
+    if main_process in workers
+        throw(ArgumentError("Will not kill the main process (process $main_process)"))
+    end
+
+    err = try
+        Distributed.remotecall_eval(Main, workers, :(exit(1)))
+    catch err
+        if !(err isa Distributed.ProcessExitedException)
+            rethrow()
+        end
+    end
+
+    return nothing
+end
+
+
+"""
+    always_addworkers(mode::ParallelProcessingTools.AddProcsMode, min_nworkers::Integer)
+
+Continously check if the number of worker processes is less than
+`min_nworkers`, and if so, add more worker processes using `mode`.
+"""
+function always_addworkers end
+export always_addworkers
+
+const _g_always_addworkers_taskch = Ref(Channel{Nothing}())
+atexit(() -> close(_g_always_addworkers_taskch[]))
+
+function always_addworkers(mode::AddProcsMode, min_nworkers::Integer)
+    close(_g_always_addworkers_taskch[])
+    _g_always_addworkers_taskch[] = Channel{Nothing}(spawn=true) do ch
+        while isopen(ch)
+            current_workers = Distributed.workers()
+            main_process = Distributed.myid()
+            if length(current_workers) < min_nworkers || length(current_workers) == 1 && only(current_workers) == main_process
+                addworkers(mode)
+            end
+            sleep(10)
+        end
+    end
+    return nothing
 end
