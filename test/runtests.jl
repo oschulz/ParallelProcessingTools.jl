@@ -10,6 +10,7 @@ Test.@testset "Package ParallelProcessingTools" begin
 
     include("test_aqua.jl")
     include("test_util.jl")
+    include("test_states.jl")
     include("test_fileio.jl")
     include("test_threadsafe.jl")
     include("test_threadlocal.jl")

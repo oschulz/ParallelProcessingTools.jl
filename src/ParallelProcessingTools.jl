@@ -13,12 +13,14 @@ import Pkg
 import ClusterManagers
 import ThreadPinning
 
+using Base: Process
 using Logging: @logmsg, LogLevel, Info, Debug
 
 using Parameters: @with_kw
 
 include("util.jl")
 include("exceptions.jl")
+include("states.jl")
 include("fileio.jl")
 include("threadsafe.jl")
 include("threadlocal.jl")
