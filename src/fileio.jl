@@ -169,7 +169,7 @@ function create_files(
                         @assert cache_fn != staging_fn
                         @debug "Moving file \"$cache_fn\" to \"$staging_fn\"."
                         isfile(cache_fn) || error("Expected file \"$cache_fn\" to exist, but it doesn't.")
-                        mv(cache_fn, staging_fn; force=true)
+                        mv(cache_fn, staging_fn)
                     end
                 end
                 empty!(cache_fnames)
