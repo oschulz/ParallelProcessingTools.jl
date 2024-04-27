@@ -261,7 +261,7 @@ function _worker_scheduler_loop(sched::_WorkerScheduler)
             @info "Worker scheduler interrupted and shutting down"
         elseif err isa EOFError
             # Seems to happen if Julia exits?
-            @warn "Worker scheduler shutting by EOFError"
+            @warn "Worker scheduler shutting down due to EOFError"
         else
             @error "Worker scheduler crashing due to unhandled exception" err
             rethrow()
@@ -427,7 +427,7 @@ _return_type(f, args::Tuple) = Core.Compiler.return_type(f, typeof(args))
     _schedule_activity!(sched, activity)
     result = take!(result_ch)
     if result isa Exception
-        throw(result)
+        throw(original_exception(result))
     else
         return result
     end
