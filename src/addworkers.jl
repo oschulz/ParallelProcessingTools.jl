@@ -59,9 +59,12 @@ function pinthreads_auto()
             end
         end
     else
-        let available_cpus = ThreadPinning.affinitymask2cpuids(ThreadPinning.get_affinity_mask())
-            ThreadPinning.pinthreads(:affinitymask)
-            LinearAlgebra.BLAS.set_num_threads(length(available_cpus))
+        @static if isdefined(ThreadPinning, :affinitymask2cpuids)
+            # Not available on all platforms:
+            let available_cpus = ThreadPinning.affinitymask2cpuids(ThreadPinning.get_affinity_mask())
+                ThreadPinning.pinthreads(:affinitymask)
+                LinearAlgebra.BLAS.set_num_threads(length(available_cpus))
+            end
         end
     end
 end
@@ -112,6 +115,15 @@ function worker_resources()
     sorted_resources
 end
 export worker_resources
+
+
+@static if isdefined(ThreadPinning, :getcpuids)
+    # Not available on all platforms:
+    _getcpuids() = ThreadPinning.getcpuids()
+else
+    _getcpuids() = missing
+end
+
 
 function _current_process_resources()
     return (
