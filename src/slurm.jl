@@ -192,7 +192,7 @@ function _get_slurm_taskconf(slurmflags::Cmd, env::AbstractDict{String,String})
     ntasks_per_node = get(env, "SLURM_NTASKS_PER_NODE", nothing)
     mem_per_node = get(env, "SLURM_MEM_PER_NODE", nothing)
 
-    args = slurmflags.exec
+    args = collect(slurmflags)
     i::Int = firstindex(args)
     while i <= lastindex(args)
         last_i = i
