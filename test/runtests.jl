@@ -2,6 +2,9 @@
 
 import Test
 
+import ThreadPinning
+ThreadPinning.Prefs.set_os_warning(false)
+
 Test.@testset "Package ParallelProcessingTools" begin
     @info "Testing with $(Base.Threads.nthreads()) Julia threads."
 
