@@ -5,8 +5,8 @@ using ParallelProcessingTools
 
 using Distributed
 
-ENV["JULIA_DEBUG"] = "ParallelProcessingTools"
-
+old_julia_debug = get(ENV, "JULIA_DEBUG", "")
+ENV["JULIA_DEBUG"] = old_julia_debug * ",ParallelProcessingTools"
 
 if !isdefined(@__MODULE__, :mytask)
     @always_everywhere begin
@@ -90,3 +90,5 @@ end
 end # Julia >= v1.9
 
 end
+
+ENV["JULIA_DEBUG"] = old_julia_debug
