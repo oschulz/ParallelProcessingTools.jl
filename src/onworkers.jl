@@ -431,7 +431,6 @@ _return_type(f, args::Tuple) = Core.Compiler.return_type(f, typeof(args))
     else
         return result
     end
-    throw(ArgumentError("tries must be greater than zero"))
 end
 
 end # Julia >= v1.9
