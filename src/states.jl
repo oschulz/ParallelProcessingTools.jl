@@ -1,5 +1,21 @@
 # This file is a part of ParallelProcessingTools.jl, licensed under the MIT License (MIT).
 
+"""
+    ParallelProcessingTools.NonZeroExitCode(cmd::Cmd, exitcode::Integer) isa Exception
+
+Exception to indicate that a an external process running `cmd` failed with the
+given exit code (not equal zero).
+"""
+struct NonZeroExitCode <: Exception
+    exitcode::Int
+end
+
+function NonZeroExitCode(exitcode::Integer)
+    exitcode == 0 && throw(ArgumentError("NonZeroExitCode exitcode must not be zero"))
+    NonZeroExitCode(exitcode)
+end
+
+
 
 """
     ParallelProcessingTools.getlabel(obj)
@@ -18,8 +34,10 @@ getlabel(process::Process) = "Process $(getlabel(process.cmd))"
     ParallelProcessingTools.isactive(obj)::Bool
 
 Checks if `obj` is still active, running or whatever applies to the type of
-`obj`. Supports `Task` and `Process` and may be specialized for other object
-types.
+`obj`.
+
+Supports `Task`, `Process`, `Channel`, `Timer`, `Base.AsyncCondition`
+and may be extended to other object types.
 
 Returns `true` if `ismissing(obj)`.
 """
@@ -28,13 +46,37 @@ function isactive end
 isactive(::Missing) = true
 isactive(task::Task) = !istaskdone(task)
 isactive(process::Process) = process_running(process)
+isactive(channel::Channel) = isopen(channel)
+isactive(timer::Timer) = isopen(timer)
+isactive(condition::Base.AsyncCondition) = isopen(condition)
+
+
+"""
+    ParallelProcessingTools.wouldwait(obj)::Bool
+
+Returns `true` if `wait(obj)` would result in waiting and `false` if
+`wait(obj)` would return (almost) immediately.
+
+Supports `Task`, `Process`, `Channel`, `Timer`, `Base.AsyncCondition`
+and may be extended to other object types.
+
+`obj` must not be `missing`.
+"""
+function wouldwait end
+
+wouldwait(task::Task) = !istaskdone(task)
+wouldwait(process::Process) = process_running(process)
+wouldwait(channel::Channel) = isopen(channel) && !isready(channel)
+wouldwait(timer::Timer) = isopen(timer)
+wouldwait(condition::Base.AsyncCondition) = isopen(condition)
 
 
 """
     ParallelProcessingTools.hasfailed(obj)::Bool
 
-Checks if `obj` has failed in some way. Supports `Task` and `Process` and may
-be specialized for other object types.
+Checks if `obj` has failed in some way.
+    
+Supports `Task` and `Process` and may be extended to other object types.
 
 Returns `false` if `ismissing(obj)`.
 """
@@ -42,15 +84,29 @@ function hasfailed end
 
 hasfailed(::Missing) = false
 hasfailed(task::Task) = istaskfailed(task)
-hasfailed(process::Process) = !iszero(process.exitcode)
+hasfailed(process::Process) = !isactive(process) && !iszero(process.exitcode)
+
+function hasfailed(channel::Channel)
+    if isactive(channel) return false
+    else
+        err = channel.excp
+        if err isa InvalidStateException
+            return err.state == :closed ? false : true
+        else
+            return true
+        end
+    end
+end
 
 
 """
     ParallelProcessingTools.whyfailed(obj)::Exception
 
-Returns a reason, as an `Exception` instance, why `obj` has failed. Supports
-`Task` and `Process` and may be specialized for other object types. `obj`
-must not be `missing`.
+Returns a reason, as an `Exception` instance, why `obj` has failed.
+
+Supports `Task` and `Process` and may be extended to other object types.
+
+`obj` must not be `missing`.
 """
 function whyfailed end
 
@@ -77,17 +133,10 @@ function whyfailed(process::Process)
     end
 end
 
-"""
-    ParallelProcessingTools.NonZeroExitCode(cmd::Cmd, exitcode::Integer) isa Exception
-
-Exception to indicate that a an external process running `cmd` failed with the
-given exit code (not equal zero).
-"""
-struct NonZeroExitCode <: Exception
-    exitcode::Int
-end
-
-function NonZeroExitCode(exitcode::Integer)
-    exitcode == 0 && throw(ArgumentError("NonZeroExitCode exitcode must not be zero"))
-    NonZeroExitCode(exitcode)
+function whyfailed(channel::Channel)
+    if hasfailed(channel)
+        return channel.excp
+    else
+        throw(ArgumentError("Channel $(getlabel(channel)) did not fail, whyfailed not allowed"))
+    end
 end
