@@ -64,3 +64,86 @@ function idle_sleep(n_idle::Integer, t_interval_s::Real, t_max_s::Real)
     sleep_ns(sleep_time_ns)
 end
 export idle_sleep
+
+
+"""
+    @wait_while(cond)
+
+Wait while `cond` is true, using slowly increasing sleep times in between
+evaluating `cond`.
+
+`cond` may be an arbitrary Julia expression.
+
+Example, wait for a task with a timeout:
+
+```julia
+task = Threads.@spawn sleep(10)
+timer = Timer(2)
+@wait_while !istaskdone(task) && isopen(timer)
+istaskdone(task) == false
+```
+"""
+macro wait_while(cond)
+    quote
+        t_start = time_ns()
+        while $(esc(cond))
+            t_waited = signed(time_ns() -t_start)
+            # Wait again for 12.5% of the time waited so far, but for 1 second
+            # at most:
+            t_sleep = min(t_waited >> 3, Int64(1000000000))
+            sleep_ns(t_sleep)
+        end
+    end
+end
+export @wait_while
+
+
+"""
+    wait_for_any(objs...)
+
+Wait for any of the objects `objs` to become ready.
+
+Readiness of objects is as defined by [`wouldwait`](@ref).
+
+Example, wait for a task with a timeout:
+
+```julia
+task = Threads.@spawn sleep(10)
+timer = Timer(2)
+wait_for_any(timer, task)
+istaskdone(task) == false
+```
+
+Similar to `waitany` (new in Julia v1.12), but applies to a wider range of
+object types.
+"""
+function wait_for_any(objs...)
+    @wait_while all(wouldwait, objs)
+end
+export wait_for_any
+
+# ToDo: Use `waitany` (Julia >= v1.12) in wait_for_any implementation where possible.
+
+
+"""
+    wait_for_all(objs...)
+
+Wait for all of the objects `objs` to become ready.
+
+Readiness of objects is as defined by [`wouldwait`](@ref).
+
+Example, wait for two tasks to finish:
+
+```julia
+task1 = Threads.@spawn sleep(10)
+task2 = Threads.@spawn sleep(2)
+wait_for_all(task1, task2)
+```
+"""
+function wait_for_all(objs...)
+    if any(wouldwait, objs)
+        map(wait, objs)
+    end
+    @assert !any(wouldwait, objs)
+end
+export wait_for_all

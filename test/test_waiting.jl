@@ -49,4 +49,36 @@ using ParallelProcessingTools
         @test 50e-6 < measure_idle_sleep(100, 10e-6, 100e-6, ntimes = 100) < sleep_test_precision * 80e-6
         @test 85e-6 < measure_idle_sleep(100000, 10e-6, 100e-6, ntimes = 100) < sleep_test_precision * 120e-6
     end
+
+    @testset "wait_while" begin
+        t0 = time()
+
+        task = Threads.@spawn sleep(5)
+        timer = Timer(0.2)
+        @wait_while !istaskdone(task) && isopen(timer)
+        @test istaskdone(task) == false
+
+        time() - t0 < 3
+    end
+
+    @testset "wait_for_any" begin
+        t0 = time()
+
+        task = Threads.@spawn sleep(5)
+        timer = Timer(0.2)
+        wait_for_any(task, timer)
+        @test istaskdone(task) == false
+
+        time() - t0 < 3
+    end
+
+    @testset "wait_for_all" begin
+        t0 = time()
+
+        task1 = Threads.@spawn sleep(1)
+        task2 = Threads.@spawn sleep(0.1)
+        wait_for_all(task1, task2)
+
+        0.8 < time() - t0 < 3
+    end
 end
