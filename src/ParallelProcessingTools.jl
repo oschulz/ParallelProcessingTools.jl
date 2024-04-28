@@ -18,7 +18,7 @@ using Logging: @logmsg, LogLevel, Info, Debug
 
 using Parameters: @with_kw
 
-include("util.jl")
+include("waiting.jl")
 include("exceptions.jl")
 include("states.jl")
 include("fileio.jl")
