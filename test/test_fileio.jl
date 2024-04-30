@@ -82,7 +82,10 @@ ENV["JULIA_DEBUG"] = old_julia_debug * ",ParallelProcessingTools"
                 @test read(fn1, String) == data1 && read(fn2, String) == data2
 
                 # Modify the target files:
-                write(fn1, "dummy content"); write(fn2, "dummy content"); 
+                modify_files(fn1, fn2, use_cache = use_cache, verbose = true) do fn1, fn2
+                    write(fn1, "modified"); write(fn2, "content")
+                end
+                @test read(fn1, String) == "modified" && read(fn2, String) == "content"
 
                 # Wont't overwrite:
                 create_files(fn1, fn2, use_cache = use_cache, overwrite = false, verbose = true) do fn1, fn2

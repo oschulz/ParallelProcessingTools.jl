@@ -92,7 +92,7 @@ end
 
 """
     function create_files(
-        f_write, filenames::AbstractString...;
+        f_create, filenames::AbstractString...;
         overwrite::Bool = true,
         use_cache::Bool = false, cache_dir::AbstractString = default_cache_dir(),
         create_dirs::Bool = true, delete_tmp_onerror::Bool=true,
@@ -100,23 +100,23 @@ end
     )
 
 Creates `filenames` in an atomic fashion via a user-provided function
-`f_write`. Returns `nothing`.
+`f_create`. Returns `nothing`.
 
-Using temporary filenames, calls `f_write(temporary_filenames...)`. If
-`f_write` doesn't throw an exception, the files `temporary_filenames` are
-renamed to `filenames`. If `f_write` throws an exception, the temporary files
+Using temporary filenames, calls `f_create(temporary_filenames...)`. If
+`f_create` doesn't throw an exception, the files `temporary_filenames` are
+renamed to `filenames`. If `f_create` throws an exception, the temporary files
 are either deleted (if `delete_tmp_onerror` is `true`) or left in place (e.g. for
 debugging purposes).
 
-If `create_dirs` is `true`, the `temporary_filenames` are created in
-`cache_dir` and then atomically moved to `filenames`, otherwise, they are
+If `use_cache` is `true`, the `temporary_filenames` are created in
+`cache_dir` and then atomically moved to `filenames`, otherwise they are
 created next to `filenames` (in the same directories).
 
 If `create_dirs` is `true`, directories are created if necessary.
 
 If all of `filenames` already exist and `overwrite` is `false`, takes no
 action (or, on case the files are created by other code running in parallel,
-while `f_write` is running, does not replace them).
+while `f_create` is running, does not replace them).
 
 If `verbose` is `true`, uses log-level `Logging.Info` to log file creation,
 otherwise `Logging.Debug`.
@@ -139,13 +139,74 @@ intermediate steps.
 
 On Linux you can set `use_cache = true` and `cache_dir = "/dev/shm"` to use
 the default Linux RAM disk as an intermediate directory.
+
+See also [`read_files`](@ref), [`modify_files`](@ref) and
+[`ParallelProcessingTools.default_cache_dir`](@ref).
 """
 function create_files(
-    @nospecialize(f_write), @nospecialize(filenames::AbstractString...);
+    @nospecialize(f_create), @nospecialize(filenames::AbstractString...);
     overwrite::Bool = true,
     use_cache::Bool = false, cache_dir::AbstractString = default_cache_dir(),
     create_dirs::Bool = true, delete_tmp_onerror::Bool=true,
     verbose::Bool = false
+)
+    _create_modify_file_impl(false, f_create, filenames, overwrite, use_cache, String(cache_dir), create_dirs, delete_tmp_onerror, verbose)
+end
+export create_files
+
+
+"""
+    function modify_files(
+        f_modify, filenames::AbstractString...;
+        use_cache::Bool = false, cache_dir::AbstractString = default_cache_dir(),
+        create_cachedir::Bool = true, delete_tmp_onerror::Bool=true,
+        verbose::Bool = false
+    )
+
+Modifies `filenames` in an atomic fashion via a user-provided function
+`f_modify`. Returns `nothing`.
+
+Using temporary filenames, first copies the files `filenames` to temporary
+filenames. Then calls `f_modify(temporary_filenames...)`. If `f_modify`
+doesn't throw an exception, the files `temporary_filenames` are then renamed
+to `filenames`, replacing them.
+
+If `use_cache` is `true`, the `temporary_filenames` are created in
+`cache_dir`, otherwise they are created next to `filenames` (in the same
+directories).
+
+Otherwise behaves like [`create_files`](@ref) and [`read_files`](@ref) in
+regard to logging and cache and error handling.
+
+Returns `nothing`.
+
+Example:
+
+```julia
+write("foo.txt", "Nothing"); write("bar.txt", "here")
+
+modify_files("foo.txt", "bar.txt", use_cache = true) do foo, bar
+    write(foo, "Hello")
+    write(bar, "World")
+end
+```
+
+See also [`ParallelProcessingTools.default_cache_dir`](@ref).
+"""
+function modify_files(
+    @nospecialize(f_modify), @nospecialize(filenames::AbstractString...);
+    use_cache::Bool = false, cache_dir::AbstractString = default_cache_dir(),
+    create_cachedir::Bool = true, delete_tmp_onerror::Bool=true,
+    verbose::Bool = false
+)
+    _create_modify_file_impl(true, f_modify, filenames, true, use_cache, String(cache_dir), create_cachedir, delete_tmp_onerror, verbose)
+end
+export modify_files
+
+
+function _create_modify_file_impl(
+    modify_mode::Bool, f_create_or_modify, filenames,
+    overwrite::Bool, use_cache::Bool, cache_dir::String, create_dirs::Bool, delete_tmp_onerror::Bool, verbose::Bool
 )
     loglevel = verbose ? Info : Debug
 
@@ -192,9 +253,18 @@ function create_files(
         @assert !any(isfile, staging_fnames)
 
         writeto_fnames = use_cache ? cache_fnames : staging_fnames
-        @debug "Creating intermediate files $writeto_fnames."
-        f_write(writeto_fnames...)
 
+        if modify_mode
+            @debug "Copying files $target_fnames to intermediate files $writeto_fnames."
+            read_files(target_fnames...; use_cache=false) do readfrom_fnames...
+                _parallel_cp(readfrom_fnames, writeto_fnames)
+            end
+            @debug "Modifying intermediate files $writeto_fnames."
+        else
+            @debug "Creating intermediate files $writeto_fnames."
+        end
+        f_create_or_modify(writeto_fnames...)
+    
         post_f_write_existing = isfile.(target_fnames)
         if any(post_f_write_existing)
             if all(post_f_write_existing)
@@ -209,14 +279,7 @@ function create_files(
 
         try
             if use_cache
-                @userfriendly_exceptions @sync for (cache_fn, staging_fn) in zip(cache_fnames, staging_fnames)
-                    Threads.@spawn begin
-                        @assert cache_fn != staging_fn
-                        @debug "Moving file \"$cache_fn\" to \"$staging_fn\"."
-                        isfile(cache_fn) || error("Expected file \"$cache_fn\" to exist, but it doesn't.")
-                        mv(cache_fn, staging_fn)
-                    end
-                end
+                _parallel_mv(cache_fnames, staging_fnames)
                 empty!(cache_fnames)
             end
 
@@ -267,7 +330,6 @@ function create_files(
 
     return nothing
 end
-export create_files
 
 
 """
@@ -289,7 +351,7 @@ afterwards.
 
 If `create_cachedir` is `true`, then `cache_dir` will be created if it doesn't
 exist yet. If `delete_tmp_onerror` is true, then temporary files are
-deleted even if `f_write` throws an exception.
+deleted even if `f_create` throws an exception.
 
 If `verbose` is `true`, uses log-level `Logging.Info` to log file reading,
 otherwise `Logging.Debug`.
@@ -307,6 +369,9 @@ intermediate steps.
 
 On Linux you can set `use_cache = true` and `cache_dir = "/dev/shm"` to use
 the default Linux RAM disk as an intermediate directory.
+
+See also [`create_files`](@ref), [`modify_files`](@ref) and
+[`ParallelProcessingTools.default_cache_dir`](@ref).
 """
 function read_files(
     @nospecialize(f_read), @nospecialize(filenames::AbstractString...);
@@ -335,14 +400,7 @@ function read_files(
             append!(cache_fnames, tmp_filename.(source_fnames, Ref(cache_dir)))
             @assert !any(isfile, cache_fnames)
 
-            @userfriendly_exceptions @sync for (cache_fn, source_fn) in zip(cache_fnames, source_fnames)
-                Threads.@spawn begin
-                    @assert cache_fn != source_fn
-                    @debug "Copying file \"$source_fn\" to \"$cache_fn\"."
-                    cp(source_fn, cache_fn)
-                    isfile(cache_fn) || error("Tried to copy file \"$source_fn\" to \"$cache_fn\", but \"$cache_fn\" doesn't exist.")
-                end
-            end
+            _parallel_cp(source_fnames, cache_fnames)
         end
 
         readfrom_fnames = use_cache ? cache_fnames : source_fnames
@@ -367,3 +425,27 @@ function read_files(
     end
 end
 export read_files
+
+
+function _parallel_mv(source_fnames, target_fnames)
+    @userfriendly_exceptions @sync for (source_fn, target_fn) in zip(source_fnames, target_fnames)
+        Threads.@spawn begin
+            @assert source_fn != target_fn
+            @debug "Moving file \"$source_fn\" to \"$target_fn\"."
+            isfile(source_fn) || error("Expected file \"$source_fn\" to exist, but it doesn't.")
+            mv(source_fn, target_fn)
+        end
+    end
+end
+
+
+function _parallel_cp(source_fnames, target_fnames)
+    @userfriendly_exceptions @sync for (target_fn, source_fn) in zip(target_fnames, source_fnames)
+        Threads.@spawn begin
+            @assert target_fn != source_fn
+            @debug "Copying file \"$source_fn\" to \"$target_fn\"."
+            cp(source_fn, target_fn)
+            isfile(target_fn) || error("Tried to copy file \"$source_fn\" to \"$target_fn\", but \"$target_fn\" did't exist afterwards.")
+        end
+    end
+end
