@@ -127,13 +127,13 @@ _return_type(f, args::Tuple) = Core.Compiler.return_type(f, typeof(args))
 
                 if _should_retry(fetched_result)
                     if !(n_tries < tries)
-                        err = original_exception(fetched_result)
+                        err = inner_exception(fetched_result)
                         throw(MaxTriesExceeded(tries, n_tries, err))
                     end
                 else
                     if fetched_result isa Exception
                         err = fetched_result
-                        orig_err = original_exception(fetched_result)
+                        orig_err = inner_exception(fetched_result)
                         throw(err)
                     else
                         @debug "Worker $worker ran $activity successfully in $elapsed_time s"
@@ -167,7 +167,7 @@ _return_type(f, args::Tuple) = Core.Compiler.return_type(f, typeof(args))
                 # Make certain that worker is really gone:
                 rmprocs(worker)
             elseif err isa RemoteException
-                orig_err = original_exception(err)
+                orig_err = inner_exception(err)
                 if orig_err isa MethodError
                     func = orig_err.f
                     func_args = orig_err.args

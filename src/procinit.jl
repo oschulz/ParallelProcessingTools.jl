@@ -326,7 +326,7 @@ end
             _g_procmgmt_initlvl[pid] = init_level
             #@debug "Initialization of process $pid to init level $init_level complete."
         catch err
-            orig_err = original_exception(err)
+            orig_err = inner_exception(err)
             @error "Error while running init code on process $pid:" orig_err
             throw(err)
         finally
@@ -367,7 +367,7 @@ function ensure_procinit_or_kill(pid::Int)
     try
         wait_for_all(ensure_procinit(pid))
     catch err
-        orig_err = original_exception(err)
+        orig_err = inner_exception(err)
         @warn "Error while initializig process $pid, removing it." orig_err
         rmprocs(pid)
     end

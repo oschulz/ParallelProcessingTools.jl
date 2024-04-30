@@ -183,7 +183,7 @@ function Base.take!(fwp::FlexWorkerPool)
                 wait_for_all(ensure_procinit(pid))
                 return pid
             catch err
-                orig_err = original_exception(err)
+                orig_err = inner_exception(err)
                 @warn "Error while initializig process $pid, removing it." orig_err
                 rmprocs(pid)
             end
