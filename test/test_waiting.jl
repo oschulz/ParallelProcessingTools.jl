@@ -52,33 +52,56 @@ using ParallelProcessingTools
 
     @testset "wait_while" begin
         t0 = time()
-
         task = Threads.@spawn sleep(5)
         timer = Timer(0.2)
         @wait_while !istaskdone(task) && isopen(timer)
         @test istaskdone(task) == false
-
-        time() - t0 < 3
+        @test time() - t0 < 3
     end
 
     @testset "wait_for_any" begin
-        t0 = time()
+        @test wait_for_any(nothing) isa Nothing
+        @test wait_for_any(nothing, nothing, nothing) isa Nothing
+        @test wait_for_any([nothing, nothing, nothing]) isa Nothing
 
+        t0 = time()
+        wait_for_any(Timer(1))
+        @test 0.5 < time() - t0 < 3
+
+        t0 = time()
         task = Threads.@spawn sleep(5)
         timer = Timer(0.2)
-        wait_for_any(task, timer)
+        wait_for_any(task, nothing, timer)
         @test istaskdone(task) == false
+        @test time() - t0 < 3
 
-        time() - t0 < 3
+        t0 = time()
+        task = Threads.@spawn sleep(5)
+        timer = Timer(0.2)
+        wait_for_any([task, nothing, timer])
+        @test istaskdone(task) == false
+        @test time() - t0 < 3
     end
 
     @testset "wait_for_all" begin
-        t0 = time()
+        @test wait_for_all(nothing) isa Nothing
+        @test wait_for_all(nothing, nothing, nothing) isa Nothing
+        @test wait_for_all([nothing, nothing, nothing]) isa Nothing
 
+        t0 = time()
+        wait_for_all(Timer(1))
+        @test 0.5 < time() - t0 < 3
+
+        t0 = time()
         task1 = Threads.@spawn sleep(1)
         task2 = Threads.@spawn sleep(0.1)
-        wait_for_all(task1, task2)
+        wait_for_all(task1, nothing, task2)
+        @test 0.8 < time() - t0 < 3
 
-        0.8 < time() - t0 < 3
+        t0 = time()
+        task1 = Threads.@spawn sleep(1)
+        task2 = Threads.@spawn sleep(0.1)
+        wait_for_all([task1, nothing, task2])
+        @test 0.8 < time() - t0 < 3
     end
 end

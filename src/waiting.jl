@@ -100,10 +100,12 @@ export @wait_while
 
 """
     wait_for_any(objs...)
+    wait_for_all(objs::Union{Tuple,AbstractVector,Base.Generator,Base.ValueIterator})
 
 Wait for any of the objects `objs` to become ready.
 
-Readiness of objects is as defined by [`wouldwait`](@ref).
+Readiness of objects is as defined by [`wouldwait`](@ref). Objects that are
+`Nothing` are ignored, i.e. not waited for.
 
 Example, wait for a task with a timeout:
 
@@ -117,20 +119,31 @@ istaskdone(task) == false
 Similar to `waitany` (new in Julia v1.12), but applies to a wider range of
 object types.
 """
-function wait_for_any(objs...)
+function wait_for_any end
+export wait_for_any
+
+wait_for_any(obj::Any) = wait(obj)
+wait_for_any(::Nothing) = nothing
+
+wait_for_any(obj, objs...) = _wait_for_any_in_iterable((obj, objs...))
+wait_for_any(objs::Union{Tuple,AbstractVector,Base.Generator,Base.ValueIterator}) = _wait_for_any_in_iterable(objs)
+
+
+function _wait_for_any_in_iterable(objs)
     @wait_while all(wouldwait, objs)
 end
-export wait_for_any
 
 # ToDo: Use `waitany` (Julia >= v1.12) in wait_for_any implementation where possible.
 
 
 """
     wait_for_all(objs...)
+    wait_for_all(objs::Union{Tuple,AbstractVector,Base.Generator,Base.ValueIterator})
 
-Wait for all of the objects `objs` to become ready.
+Wait for all of the `objs` to become ready.
 
-Readiness of objects is as defined by [`wouldwait`](@ref).
+Readiness of objects is as defined by [`wouldwait`](@ref). Objects that are
+`Nothing` are ignored, i.e. not waited for.
 
 Example, wait for two tasks to finish:
 
@@ -140,10 +153,17 @@ task2 = Threads.@spawn sleep(2)
 wait_for_all(task1, task2)
 ```
 """
-function wait_for_all(objs...)
+function wait_for_all end
+export wait_for_all
+
+wait_for_all(obj) = wait_for_any(obj)
+
+wait_for_all(obj, objs...) = _wait_for_all_in_iterable((obj, objs...))
+wait_for_all(objs::Union{Tuple,AbstractVector,Base.Generator,Base.ValueIterator}) = _wait_for_all_in_iterable(objs)
+
+function _wait_for_all_in_iterable(objs)
     if any(wouldwait, objs)
-        map(wait, objs)
+        foreach(wait_for_any, objs)
     end
     @assert !any(wouldwait, objs)
 end
-export wait_for_all
