@@ -1,50 +1,5 @@
 # This file is a part of ParallelProcessingTools.jl, licensed under the MIT License (MIT).
 
-const _g_processops_lock = ReentrantLock()
-
-const _g_always_everywhere_code = quote
-    import ParallelProcessingTools
-end
-
-
-"""
-    always_everywhere(expr)
-
-Runs `expr` on all current Julia processes, but also all future Julia
-processes added via [`addworkers`](@ref)).
-
-Similar to `Distributed.everywhere`, but also stores `expr` so that
-`addworkers` can execute it automatically on new worker processes.
-"""
-macro always_everywhere(expr)
-    return quote
-        try
-            lock(_g_processops_lock)
-            expr = $(esc(Expr(:quote, expr)))
-            push!(_g_always_everywhere_code.args, expr)
-            _run_expr_on_procs(expr, Distributed.procs())
-        finally
-            unlock(_g_processops_lock)
-        end
-    end
-end
-export @always_everywhere
-
-
-function _run_expr_on_procs(expr, procs::AbstractVector{<:Integer})
-    mod_expr = Expr(:toplevel, :(task_local_storage()[:SOURCE_PATH] = $(get(task_local_storage(), :SOURCE_PATH, nothing))), expr)
-    Distributed.remotecall_eval(Main, procs, mod_expr)
-end
-
-function _run_always_everywhere_code(@nospecialize(procs::AbstractVector{<:Integer}); pre_always::Expr = :())
-    code = quote
-        $pre_always
-        $_g_always_everywhere_code
-    end
-
-    _run_expr_on_procs(code, procs)
-end
-
 
 """
     pinthreads_auto()
@@ -144,27 +99,18 @@ Abstract supertype for worker process addition modes.
 Subtypes must implement:
 
 * `ParallelProcessingTools.addworkers(mode::SomeAddProcsMode)`
-
-and may want to specialize:
-
-* `ParallelProcessingTools.worker_init_code(mode::SomeAddProcsMode)`
 """
 abstract type AddProcsMode end
-
-
-"""
-    ParallelProcessingTools.worker_init_code(::AddProcsMode)::Expr
-
-Get a Julia code expression to run on new worker processes even before
-running [`@always_everywhere`](@ref) code on them.
-"""
-function worker_init_code end
-worker_init_code(::AddProcsMode) = :()
 
 
 
 """
     addworkers(mode::ParallelProcessingTools.AddProcsMode)
+
+    addworkers(
+        mode::ParallelProcessingTools.AddProcsMode,
+        pool::Union{AbstractWorkerPool,Nothing}
+    )
 
 Add Julia worker processes for LEGEND data processing.
 
@@ -198,6 +144,10 @@ See also [`worker_resources()`](@ref).
 function addworkers end
 export addworkers
 
+function addworkers(mode::ParallelProcessingTools.AddProcsMode)
+    addworkers(mode, default_flex_worker_pool())
+end
+
 
 """
     LocalProcesses(;
@@ -212,10 +162,13 @@ end
 export LocalProcesses
 
 
-function addworkers(mode::LocalProcesses)
+function addworkers(
+    mode::LocalProcesses,
+    @nospecialize(pool::Union{AbstractWorkerPool,Nothing})
+)
     n_workers = mode.nprocs
     try
-        lock(_g_processops_lock)
+        lock(allprocs_management_lock())
 
         @info "Adding $n_workers Julia processes on current host"
 
@@ -230,18 +183,26 @@ function addworkers(mode::LocalProcesses)
             exeflags = `--project=$julia_project --threads=$worker_nthreads`
         )
 
-        @info "Configuring $n_workers new Julia worker processes"
-
-        _run_always_everywhere_code(new_workers, pre_always = worker_init_code(mode))
-        _maybe_add_workers_to_scheduler(new_workers)
-
-        # Sanity check:
-        worker_ids = Distributed.remotecall_fetch.(Ref(Distributed.myid), Distributed.workers())
-        @assert length(worker_ids) == Distributed.nworkers()
+        _init_new_workers(new_workers, pool)
 
         @info "Added $(length(new_workers)) Julia worker processes on current host"
     finally
-        unlock(_g_processops_lock)
+        unlock(allprocs_management_lock())
+    end
+end
+
+
+function _init_new_workers(
+    new_workers::AbstractVector{<:Integer},
+    @nospecialize(pool::Union{AbstractWorkerPool,Nothing})
+)
+    @info "Sending initialization code to $(length(new_workers)) new worker processes"
+    r = ensure_procinit(new_workers)
+    wait_for_all(values(r))
+
+    if !isnothing(pool)
+        @info "Adding $(length(new_workers)) to worker pool $(getlabel(pool))"
+        foreach(Base.Fix1(push!, pool), new_workers)
     end
 end
 
@@ -268,13 +229,13 @@ end
 
 """
     ParallelProcessingTools.default_elastic_manager()
-    ParallelProcessingTools.default_elastic_manager(manager::ClusterManagers.ElasticManager)
+    ParallelProcessingTools.default_elastic_manager(manager::ClusterManager)
 
 Get or set the default elastic cluster manager.
 """
 function default_elastic_manager end
 
-const _g_elastic_manager = Ref{Union{Nothing, ClusterManagers.ElasticManager}}(nothing)
+const _g_elastic_manager = Ref{Union{Nothing,ClusterManager}}(nothing)
 
 function default_elastic_manager()
     if isnothing(_g_elastic_manager[])
@@ -283,7 +244,7 @@ function default_elastic_manager()
     return _g_elastic_manager[]
 end
     
-function default_elastic_manager(manager::ClusterManagers.ElasticManager)
+function default_elastic_manager(manager::ClusterManager)
     _g_elastic_manager[] = manager
     return _g_elastic_manager[]
 end
@@ -298,8 +259,8 @@ elastic cluster manager.
 
 Subtypes must implement:
 
-* `ParallelProcessingTools.worker_start_command(mode::SomeElasticAddProcsMode, manager::ClusterManagers.ElasticManager)`
-* `ParallelProcessingTools.start_elastic_workers(mode::SomeElasticAddProcsMode, manager::ClusterManagers.ElasticManager)`
+* `ParallelProcessingTools.worker_start_command(mode::SomeElasticAddProcsMode, manager::ClusterManager)`
+* `ParallelProcessingTools.start_elastic_workers(mode::SomeElasticAddProcsMode, manager::ClusterManager)`
 
 and may want to specialize:
 
@@ -310,7 +271,7 @@ abstract type ElasticAddProcsMode <: AddProcsMode end
 """
     ParallelProcessingTools.worker_start_command(
         mode::ElasticAddProcsMode,
-        manager::ClusterManagers.ElasticManager = ParallelProcessingTools.default_elastic_manager()
+        manager::ClusterManager = ParallelProcessingTools.default_elastic_manager()
     )::Tuple{Cmd,Integer}
 
 Return the system command to start worker processes as well as the number of
@@ -384,9 +345,12 @@ a `Task`, `Process` or any other object that supports
 function start_elastic_workers end
 
 
-function addworkers(mode::ElasticAddProcsMode)
+function addworkers(
+    mode::ElasticAddProcsMode,
+    @nospecialize(pool::Union{AbstractWorkerPool,Nothing})
+)
     try
-        lock(_g_processops_lock)
+        lock(allprocs_management_lock())
 
         manager = default_elastic_manager()
 
@@ -442,9 +406,7 @@ function addworkers(mode::ElasticAddProcsMode)
         new_workers = setdiff(Distributed.workers(), old_procs)
         n_new = length(new_workers)
 
-        @info "Initializing $n_new new Julia worker processes"
-        _run_always_everywhere_code(new_workers, pre_always = worker_init_code(mode))
-        _maybe_add_workers_to_scheduler(new_workers)
+        _init_new_workers(new_workers, pool)
 
         @info "Added $n_new new Julia worker processes"
 
@@ -452,7 +414,7 @@ function addworkers(mode::ElasticAddProcsMode)
             throw(ErrorException("Tried to add $n_to_add new workers, but added $n_new"))
         end
     finally
-        unlock(_g_processops_lock)
+        unlock(allprocs_management_lock())
     end
 end
 
@@ -495,33 +457,6 @@ function start_elastic_workers(mode::ExternalProcesses, manager::ClusterManagers
     start_cmd, n_workers = worker_start_command(mode, manager)
     @info "To add Julia worker processes, run ($n_workers times in parallel, I'll wait for them): $start_cmd"
     return n_workers, missing
-end
-
-
-"""
-    killworkers(worker::Integer)
-    killworkers(workers::AbstractVector{<:Integer})
-
-Kill one or more worker processes.
-"""
-function killworkers end
-export killworkers
-
-function killworkers(workers::Union{Integer,AbstractVector{<:Integer}})
-    main_process = Distributed.myid()
-    if main_process in workers
-        throw(ArgumentError("Will not kill the main process (process $main_process)"))
-    end
-
-    err = try
-        Distributed.remotecall_eval(Main, workers, :(exit(1)))
-    catch err
-        if !(err isa Distributed.ProcessExitedException)
-            rethrow()
-        end
-    end
-
-    return nothing
 end
 
 

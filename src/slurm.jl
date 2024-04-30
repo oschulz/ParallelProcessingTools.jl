@@ -101,12 +101,6 @@ function ParallelProcessingTools.start_elastic_workers(mode::SlurmRun, manager::
     end
 end
 
-function worker_init_code(::SlurmRun)
-    quote
-        import ParallelProcessingTools
-        ParallelProcessingTools.pinthreads_auto()
-    end
-end
 
 elastic_addprocs_timeout(mode::SlurmRun) = mode.timeout
 

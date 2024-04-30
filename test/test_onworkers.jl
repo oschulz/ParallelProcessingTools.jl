@@ -44,13 +44,22 @@ end
 @testset "onworkers" begin
 
 @static if VERSION >= v"1.9"
+    #=
+    # For Debugging:
+    try; onworker(() -> error("foo"), label = "myactivity") ; catch err; err; end
+    try; onworker(() -> 42, 2, label = "myactivity") ; catch err; err; end
+    try; onworker(() -> 42, label = "myactivity") ; catch err; err; end
+    try; onworker((x) -> 40 + x, 2, label = "myactivity") ; catch err; err; end
+    try; onworker(() -> sleep(5), label = "myactivity", maxtime = 1) ; catch err; err; end
+    try; onworker(() -> sleep(5), label = "myactivity", maxtime = 1, tries = 3) ; catch err; err; end
+    =#
 
-    @test @inferred(on_free_worker(mytask)) == ()
-    @test @inferred(on_free_worker(mytask, 1, "foo")) == ("foo", )
-    @test @inferred(on_free_worker(gen_mayfail(0.5), "foo", 42; tries = 20, label = "mayfail")) == ("foo", 42)
+    @test @inferred(onworker(mytask)) == ()
+    @test @inferred(onworker(mytask, 1, "foo")) == ("foo", )
+    @test @inferred(onworker(gen_mayfail(0.5), "foo", 42; tries = 20, label = "mayfail")) == ("foo", 42)
 
-    @test_throws ParallelProcessingTools.MaxTriesExceeded on_free_worker(gen_mayfail(1), "bar"; tries = 2, label = "mayfail")
-    @test_throws ParallelProcessingTools.MaxTriesExceeded on_free_worker(mytask, 2, "foo", time = 0.5, tries = 2)
+    @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(gen_mayfail(1), "bar"; tries = 2, label = "mayfail")
+    @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(mytask, 2, "foo", time = 0.5, tries = 2)
     
     addworkers(LocalProcesses(2))
     @test nprocs() == 3
@@ -59,32 +68,32 @@ end
 
     @sync begin
         for i in 1:8
-            @async on_free_worker(mytask, 1, i)
+            @async onworker(mytask, 1, i)
         end
     end
 
-    @test @inferred(on_free_worker(mytask)) == ()
-    @test @inferred(on_free_worker(mytask, 1, "foo")) == ("foo", )
-    @test @inferred(on_free_worker(gen_mayfail(0.5), "foo", 42; tries = 20, label = "mayfail")) == ("foo", 42)
+    @test @inferred(onworker(mytask)) == ()
+    @test @inferred(onworker(mytask, 1, "foo")) == ("foo", )
+    @test @inferred(onworker(gen_mayfail(0.5), "foo", 42; tries = 20, label = "mayfail")) == ("foo", 42)
 
-    @test_throws ParallelProcessingTools.MaxTriesExceeded on_free_worker(gen_mayfail(1), "bar"; tries = 2, label = "mayfail")
+    @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(gen_mayfail(1), "bar"; tries = 2, label = "mayfail")
 
 
     #=
     # Run these manually for now. Not sure how to make Test enviroment ignore the
     # EOFError exceptions that originate when we kill workers due to timeouts.
 
-    @test_throws ParallelProcessingTools.MaxTriesExceeded on_free_worker(mytask, 2, "foo", time = 0.5, tries = 2)
+    @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(mytask, 2, "foo", time = 0.5, tries = 2)
     @test nprocs() == 1
 
     addworkers(LocalProcesses(2))
 
-    @test @inferred(on_free_worker(mytask)) == ()
-    @test @inferred(on_free_worker(mytask, 1, "foo")) == ("foo", )
-    @test @inferred(on_free_worker(gen_mayfail(0.5), "foo", 42; tries = 20, label = "mayfail")) == ("foo", 42)
+    @test @inferred(onworker(mytask)) == ()
+    @test @inferred(onworker(mytask, 1, "foo")) == ("foo", )
+    @test @inferred(onworker(gen_mayfail(0.5), "foo", 42; tries = 20, label = "mayfail")) == ("foo", 42)
 
-    @test_throws ParallelProcessingTools.MaxTriesExceeded on_free_worker(gen_mayfail(1), "bar"; tries = 2, label = "mayfail")
-    @test_throws ParallelProcessingTools.MaxTriesExceeded on_free_worker(mytask, 2, "foo", time = 0.5, tries = 2)
+    @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(gen_mayfail(1), "bar"; tries = 2, label = "mayfail")
+    @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(mytask, 2, "foo", time = 0.5, tries = 2)
     =#
 
 end # Julia >= v1.9

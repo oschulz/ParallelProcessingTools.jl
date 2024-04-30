@@ -5,6 +5,8 @@ using ParallelProcessingTools
 
 using ParallelProcessingTools: getlabel, isactive, wouldwait, hasfailed, whyfailed
 
+using Distributed: myid
+
 @testset "states" begin
     good_task = Threads.@spawn 42
     bad_task = Threads.@spawn error("Some error")
@@ -18,6 +20,9 @@ using ParallelProcessingTools: getlabel, isactive, wouldwait, hasfailed, whyfail
     else
         error("Unsupported OS")
     end
+
+    running_future = remotecall(()->sleep(20), myid())
+    complete_future = remotecall(()-> 42, myid())
 
     empty_open_channel = Channel{Int}(1)
     ready_open_channel = Channel{Int}(1)
@@ -45,6 +50,8 @@ using ParallelProcessingTools: getlabel, isactive, wouldwait, hasfailed, whyfail
         @test getlabel(bad_process)  isa String
         @test getlabel(active_timer) isa String
         @test getlabel(stopped_timer) isa String
+        @test getlabel(running_future) isa String
+        @test getlabel(complete_future) isa String
         @test getlabel(empty_open_channel) isa String
         @test getlabel(ready_open_channel) isa String
         @test getlabel(good_closed_channel) isa String
@@ -62,6 +69,8 @@ using ParallelProcessingTools: getlabel, isactive, wouldwait, hasfailed, whyfail
         @test isactive(bad_process) == false
         @test isactive(active_timer) == true
         @test isactive(stopped_timer) == false
+        @test isactive(running_future) == true
+        @test isactive(complete_future) == false
         @test isactive(empty_open_channel) == true
         @test isactive(ready_open_channel) == true
         @test isactive(good_closed_channel) == false
@@ -79,6 +88,8 @@ using ParallelProcessingTools: getlabel, isactive, wouldwait, hasfailed, whyfail
         @test wouldwait(bad_process) == false
         @test wouldwait(active_timer) == true
         @test wouldwait(stopped_timer) == false
+        @test wouldwait(running_future) == true
+        @test wouldwait(complete_future) == false
         @test wouldwait(empty_open_channel) == true
         @test wouldwait(ready_open_channel) == false
         @test wouldwait(good_closed_channel) == false

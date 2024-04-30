@@ -28,6 +28,7 @@ function getlabel end
 getlabel(obj) = convert(String, string(obj))
 getlabel(task::Task) = "Task $(nameof(typeof(task.code)))"
 getlabel(process::Process) = "Process $(getlabel(process.cmd))"
+getlabel(future::Future) = "Future $(future.id)"
 
 
 """
@@ -36,8 +37,8 @@ getlabel(process::Process) = "Process $(getlabel(process.cmd))"
 Checks if `obj` is still active, running or whatever applies to the type of
 `obj`.
 
-Supports `Task`, `Process`, `Channel`, `Timer`, `Base.AsyncCondition`
-and may be extended to other object types.
+Supports `Task`, `Process`, `Future`, `Channel`, `Timer`,
+`Base.AsyncCondition` and may be extended to other object types.
 
 Returns `false` if `isnothing(obj)` and `true` if `ismissing(obj)`.
 """
@@ -47,6 +48,7 @@ isactive(::Nothing) = false
 isactive(::Missing) = true
 isactive(task::Task) = !istaskdone(task)
 isactive(process::Process) = process_running(process)
+isactive(future::Future) = !isready(future)
 isactive(channel::Channel) = isopen(channel)
 isactive(timer::Timer) = isopen(timer)
 isactive(condition::Base.AsyncCondition) = isopen(condition)
@@ -58,8 +60,8 @@ isactive(condition::Base.AsyncCondition) = isopen(condition)
 Returns `true` if `wait(obj)` would result in waiting and `false` if
 `wait(obj)` would return (almost) immediately.
 
-Supports `Task`, `Process`, `Channel`, `Timer`, `Base.AsyncCondition`
-and may be extended to other object types.
+Supports `Task`, `Process`, `Future`, `Channel`, `Timer`,
+`Base.AsyncCondition` and may be extended to other object types.
 
 Returns `false` if `isnothing(obj)` but `obj` must not be `missing`.
 """
@@ -69,6 +71,7 @@ wouldwait(::Nothing) = false
 wouldwait(::Missing) = throw(ArgumentError("wouldwait does not support Missing"))
 wouldwait(task::Task) = !istaskdone(task)
 wouldwait(process::Process) = process_running(process)
+wouldwait(future::Future) = !isready(future)
 wouldwait(channel::Channel) = isopen(channel) && !isready(channel)
 wouldwait(timer::Timer) = isopen(timer)
 wouldwait(condition::Base.AsyncCondition) = isopen(condition)
