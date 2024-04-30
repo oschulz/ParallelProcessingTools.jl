@@ -9,6 +9,7 @@ using Distributed
 
 import LinearAlgebra
 import Pkg
+import Sockets
 
 import ClusterManagers
 import ThreadPinning
@@ -16,6 +17,7 @@ import ThreadPinning
 using Base: Process
 using Logging: @logmsg, LogLevel, Info, Debug
 
+using ArgCheck: @argcheck
 using Parameters: @with_kw
 
 include("waiting.jl")
