@@ -168,8 +168,24 @@ _return_type(f, args::Tuple) = Core.Compiler.return_type(f, typeof(args))
                 rmprocs(worker)
             elseif err isa RemoteException
                 orig_err = original_exception(err)
-                @debug "Encountered exception while trying to run $activity on worker $worker:" orig_err
-                rethrow()
+                if orig_err isa MethodError
+                    func = orig_err.f
+                    func_args = orig_err.args
+                    func_name = string(typeof(func))
+                    func_module = nameof(parentmodule(parentmodule(typeof(func))))
+                    func_hasmethod_local = hasmethod(func, map(typeof, func_args))
+                    if func_module == :Serialization && func_hasmethod_local
+                        @warn "Function $func_name may be corrupted on worker $worker (missing method), terminating worker."
+                        rmprocs(worker)
+                        # This try doesn't count:
+                        n_tries -= 1
+                    else
+                        rethrow()
+                    end
+                else
+                    @debug "Encountered exception while trying to run $activity on worker $worker:" orig_err
+                    rethrow()
+                end
             elseif err isa MaxTriesExceeded
                 retry_reason = err.retry_reason
                 @debug "Giving up on $activity after $err.n_tries tries due to" retry_reason
