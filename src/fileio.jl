@@ -51,7 +51,7 @@ _rand_fname_tag() = String(rand(b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJ
         overwrite::Bool = true,
         use_cache::Bool = false, cache_dir::AbstractString = tempdir(),
         create_dirs::Bool = true, delete_tmp_onerror::Bool=true,
-        verbose::Bool = true
+        verbose::Bool = false
     )
 
 Creates `filenames` in an atomic fashion via a user-provided function
@@ -100,7 +100,7 @@ function create_files(
     overwrite::Bool = true,
     use_cache::Bool = false, cache_dir::AbstractString = tempdir(),
     create_dirs::Bool = true, delete_tmp_onerror::Bool=true,
-    verbose::Bool = true
+    verbose::Bool = false
 )
     loglevel = verbose ? Info : Debug
 
@@ -230,7 +230,7 @@ export create_files
         f_read, filenames::AbstractString...;
         use_cache::Bool = true, cache_dir::AbstractString = tempdir(),
         create_cachedir::Bool = true, delete_tmp_onerror::Bool=true,
-        verbose::Bool = true
+        verbose::Bool = false
     )
 
 Reads `filenames` in an atomic fashion (i.e. only if all `filenames` exist)
@@ -267,7 +267,7 @@ function read_files(
     @nospecialize(f_read), @nospecialize(filenames::AbstractString...);
     use_cache::Bool = true, cache_dir::AbstractString = tempdir(),
     create_cachedir::Bool = true, delete_tmp_onerror::Bool=true,
-    verbose::Bool = true
+    verbose::Bool = false
 )
     loglevel = verbose ? Info : Debug
 
