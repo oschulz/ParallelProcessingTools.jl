@@ -45,11 +45,56 @@ tmp_filename(fname::AbstractString) = tmp_filename(fname, dirname(fname))
 _rand_fname_tag() = String(rand(b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", 8))
 
 
+const _g_default_cachedir = Ref{String}("")
+const _g_default_cachedir_lock = ReentrantLock()
+
+"""
+    ParallelProcessingTools.default_cache_dir()::String
+
+Returns the default cache directory, e.g. for [`create_files`](@ref) and
+`read_files`(@ref).
+
+See also [`default_cache_dir!`](@ref).
+"""
+function default_cache_dir()
+    lock(_g_default_cachedir_lock) do
+        if isempty(_g_default_cachedir[])
+            cache_dir = _generate_cache_path()
+            @info "Setting default cache directory to \"$cache_dir\""
+            default_cache_dir!(cache_dir)
+        end
+        return _g_default_cachedir[]
+    end
+end
+
+function _generate_cache_path()
+    username_var = Sys.iswindows() ? "USERNAME" : "USER"
+    tag = get(ENV, username_var, _rand_fname_tag())
+    return joinpath(tempdir(), "pptjl-cache-$tag")
+end
+
+
+"""
+    ParallelProcessingTools.default_cache_dir!(dir::AbstractString)
+
+Sets the default cache directory to `dir` and returns it.
+
+See also [`default_cache_dir!`](@ref).
+"""
+function default_cache_dir!(dir::AbstractString)
+    lock(_g_default_cachedir_lock) do
+        _g_default_cachedir[] = dir
+        return _g_default_cachedir[]
+    end
+end
+
+
+
 """
     function create_files(
         f_write, filenames::AbstractString...;
         overwrite::Bool = true,
-        use_cache::Bool = false, cache_dir::AbstractString = tempdir(),
+        use_cache::Bool = false, cache_dir::AbstractString = default_cache_dir(),
         create_dirs::Bool = true, delete_tmp_onerror::Bool=true,
         verbose::Bool = false
     )
@@ -98,7 +143,7 @@ the default Linux RAM disk as an intermediate directory.
 function create_files(
     @nospecialize(f_write), @nospecialize(filenames::AbstractString...);
     overwrite::Bool = true,
-    use_cache::Bool = false, cache_dir::AbstractString = tempdir(),
+    use_cache::Bool = false, cache_dir::AbstractString = default_cache_dir(),
     create_dirs::Bool = true, delete_tmp_onerror::Bool=true,
     verbose::Bool = false
 )
@@ -228,7 +273,7 @@ export create_files
 """
     function read_files(
         f_read, filenames::AbstractString...;
-        use_cache::Bool = true, cache_dir::AbstractString = tempdir(),
+        use_cache::Bool = true, cache_dir::AbstractString = default_cache_dir(),
         create_cachedir::Bool = true, delete_tmp_onerror::Bool=true,
         verbose::Bool = false
     )
@@ -265,7 +310,7 @@ the default Linux RAM disk as an intermediate directory.
 """
 function read_files(
     @nospecialize(f_read), @nospecialize(filenames::AbstractString...);
-    use_cache::Bool = true, cache_dir::AbstractString = tempdir(),
+    use_cache::Bool = true, cache_dir::AbstractString = default_cache_dir(),
     create_cachedir::Bool = true, delete_tmp_onerror::Bool=true,
     verbose::Bool = false
 )

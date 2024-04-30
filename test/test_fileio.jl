@@ -3,7 +3,7 @@
 using Test
 using ParallelProcessingTools
 
-using ParallelProcessingTools: split_basename_ext, tmp_filename
+using ParallelProcessingTools: split_basename_ext, tmp_filename, default_cache_dir, default_cache_dir!
 
 old_julia_debug = get(ENV, "JULIA_DEBUG", "")
 ENV["JULIA_DEBUG"] = old_julia_debug * ",ParallelProcessingTools"
@@ -34,6 +34,17 @@ ENV["JULIA_DEBUG"] = old_julia_debug * ",ParallelProcessingTools"
             @test startswith(tmp_bn, "test_")
             @test tmp_ex == ".tar.gz"
         end
+    end
+
+    @testset "default_cache_dir" begin
+        @test @inferred(default_cache_dir()) isa String
+        orig_cache_dir = default_cache_dir()
+        @test mkpath(orig_cache_dir) == orig_cache_dir
+        dummy_cache_dir = joinpath("some", "tmp", "dir")
+        @test @inferred(default_cache_dir!(dummy_cache_dir)) == dummy_cache_dir
+        @test default_cache_dir() == dummy_cache_dir
+        @test default_cache_dir!(orig_cache_dir) == orig_cache_dir
+        @test default_cache_dir() == orig_cache_dir
     end
 
     for use_cache in [false, true]
