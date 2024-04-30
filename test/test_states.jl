@@ -5,7 +5,7 @@ using ParallelProcessingTools
 
 using ParallelProcessingTools: getlabel, isactive, wouldwait, hasfailed, whyfailed
 
-using Distributed: myid
+using Distributed: myid, remotecall
 
 @testset "states" begin
     good_task = Threads.@spawn 42
