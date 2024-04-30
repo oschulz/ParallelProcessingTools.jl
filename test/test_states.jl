@@ -37,6 +37,7 @@ using ParallelProcessingTools: getlabel, isactive, wouldwait, hasfailed, whyfail
     sleep(2)
 
     @testset "getlabel" begin
+        @test getlabel(nothing) isa String
         @test getlabel(missing) isa String
         @test getlabel(good_task) isa String
         @test getlabel(bad_task) isa String
@@ -53,6 +54,7 @@ using ParallelProcessingTools: getlabel, isactive, wouldwait, hasfailed, whyfail
     end
 
     @testset "isactive" begin
+        @test isactive(nothing)== false
         @test isactive(missing) == true
         @test isactive(good_task) == false
         @test isactive(bad_task) == false
@@ -69,6 +71,8 @@ using ParallelProcessingTools: getlabel, isactive, wouldwait, hasfailed, whyfail
     end
 
     @testset "wouldwait" begin
+        @test wouldwait(nothing) == false
+        @test_throws ArgumentError wouldwait(missing)
         @test wouldwait(good_task) == false
         @test wouldwait(bad_task) == false
         @test wouldwait(good_process) == false
@@ -84,6 +88,7 @@ using ParallelProcessingTools: getlabel, isactive, wouldwait, hasfailed, whyfail
     end
 
     @testset "hasfailed" begin
+        @test hasfailed(nothing) == false
         @test hasfailed(missing) == false
         @test hasfailed(good_task) == false
         @test hasfailed(bad_task) == true
@@ -95,6 +100,7 @@ using ParallelProcessingTools: getlabel, isactive, wouldwait, hasfailed, whyfail
     end
 
     @testset "whyfailed" begin
+        @test_throws ArgumentError whyfailed(nothing)
         @test_throws ArgumentError whyfailed(missing)
         @test_throws ArgumentError whyfailed(good_task)
         @test_throws ArgumentError whyfailed(good_process)

@@ -39,10 +39,11 @@ Checks if `obj` is still active, running or whatever applies to the type of
 Supports `Task`, `Process`, `Channel`, `Timer`, `Base.AsyncCondition`
 and may be extended to other object types.
 
-Returns `true` if `ismissing(obj)`.
+Returns `false` if `isnothing(obj)` and `true` if `ismissing(obj)`.
 """
 function isactive end
 
+isactive(::Nothing) = false
 isactive(::Missing) = true
 isactive(task::Task) = !istaskdone(task)
 isactive(process::Process) = process_running(process)
@@ -60,10 +61,12 @@ Returns `true` if `wait(obj)` would result in waiting and `false` if
 Supports `Task`, `Process`, `Channel`, `Timer`, `Base.AsyncCondition`
 and may be extended to other object types.
 
-`obj` must not be `missing`.
+Returns `false` if `isnothing(obj)` but `obj` must not be `missing`.
 """
 function wouldwait end
 
+wouldwait(::Nothing) = false
+wouldwait(::Missing) = throw(ArgumentError("wouldwait does not support Missing"))
 wouldwait(task::Task) = !istaskdone(task)
 wouldwait(process::Process) = process_running(process)
 wouldwait(channel::Channel) = isopen(channel) && !isready(channel)
@@ -78,10 +81,11 @@ Checks if `obj` has failed in some way.
     
 Supports `Task` and `Process` and may be extended to other object types.
 
-Returns `false` if `ismissing(obj)`.
+Returns `false` if `isnothing(obj)` or `ismissing(obj)`.
 """
 function hasfailed end
 
+hasfailed(::Nothing) = false
 hasfailed(::Missing) = false
 hasfailed(task::Task) = istaskfailed(task)
 hasfailed(process::Process) = !isactive(process) && !iszero(process.exitcode)
@@ -106,10 +110,11 @@ Returns a reason, as an `Exception` instance, why `obj` has failed.
 
 Supports `Task` and `Process` and may be extended to other object types.
 
-`obj` must not be `missing`.
+`obj` must not be `nothing` or `missing`.
 """
 function whyfailed end
 
+whyfailed(::Nothing) = throw(ArgumentError("whyfailed does not support Nothing"))
 whyfailed(::Missing) = throw(ArgumentError("whyfailed does not support Missing"))
 
 function whyfailed(task::Task)
