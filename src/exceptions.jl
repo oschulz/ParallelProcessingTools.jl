@@ -66,3 +66,26 @@ macro userfriendly_exceptions(expr)
     end
 end
 export @userfriendly_exceptions
+
+
+"""
+    @return_exceptions expr
+
+Runs `expr` and catches and returns exceptions as values instead of having
+them thrown.
+
+Useful for user-side debugging, especially of parallel and/or remote code
+execution.
+
+See also [`@userfriendly_exceptions`](@ref).
+"""
+macro return_exceptions(expr)
+    quote
+        try
+            $(esc(expr))
+        catch err
+            return err
+        end
+    end
+end
+export @return_exceptions
