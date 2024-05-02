@@ -186,6 +186,7 @@ function Base.take!(fwp::FlexWorkerPool)
                 orig_err = inner_exception(err)
                 @warn "Error while initializig process $pid, removing it." orig_err
                 rmprocs(pid)
+                put!(fwp, pid)
             end
         else
             return pid
