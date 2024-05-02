@@ -64,6 +64,8 @@ end
 Get the distributed Julia process resources currently available.
 """
 function worker_resources()
+    load_ft = Distributed.remotecall.(Core.eval, Distributed.workers(), Ref(Main), Ref(:(import ParallelProcessingTools)))
+    fetch.(load_ft)
     resources_ft = Distributed.remotecall.(ParallelProcessingTools._current_process_resources, Distributed.workers())
     resources = fetch.(resources_ft)
     sorted_resources = sort(resources, by = x -> x.workerid)
