@@ -66,6 +66,7 @@ struct FlexWorkerPool{WP<:AbstractWorkerPool} <: AbstractWorkerPool
     _spares::Channel{Tuple{Int,Int}}
     _worker_mgmt::Threads.Condition
     _worker_history::Set{Int}
+    _worker_occupancy::IdDict{Int,Int}
 end
 export FlexWorkerPool
 
@@ -82,27 +83,24 @@ function FlexWorkerPool{WP}(
     spares = Channel{Tuple{Int,Int}}(typemax(Int))
     worker_mgmt = Threads.Condition()
     worker_history = Set{Int}()
+    _worker_occupancy = IdDict{Int,Int}()
 
-    mypid = myid()
-    for _ in 1:oversubscription
-        for pid in worker_pids
-            if isvalid_pid(pid)
-                if pid != mypid
-                    push!(pool, pid)
-                else
-                    push!(mypid_pool, pid)
-                end
-                push!(worker_history, pid)
-            end
-        end
+    fwp = FlexWorkerPool{WP}(
+        pool, mypid_pool, label, oversubscription, init_workers,
+        spares, worker_mgmt, worker_history, _worker_occupancy
+    )
+
+    for pid in worker_pids
+        push!(fwp, pid)
     end
 
-    FlexWorkerPool{WP}(pool, mypid_pool, label, oversubscription, init_workers, spares, worker_mgmt, worker_history)
+    return fwp
 end
 
 function FlexWorkerPool(worker_pids::AbstractVector{Int} = [Distributed.myid()]; kwargs...)
     return FlexWorkerPool{WorkerPool}(worker_pids; kwargs...)
 end
+
 
 function Base.show(io::IO, @nospecialize(fwp::FlexWorkerPool))
     print(io, "FlexWorkerPool{$(nameof(typeof(fwp._pool)))}(...")
@@ -111,6 +109,43 @@ function Base.show(io::IO, @nospecialize(fwp::FlexWorkerPool))
     end
     print(io, ")")
 end
+
+function Base.show(io::IO, ::MIME"text/plain", @nospecialize(fwp::FlexWorkerPool))
+    show(io, fwp)
+    println(io)
+
+    pids, occupancy = lock(fwp._worker_mgmt) do
+        deepcopy(workers(fwp)), deepcopy(fwp._worker_occupancy)
+    end
+    whmap = _worker_hosts()
+    host_worker_occupancy = IdDict{String,Vector{Int}}()
+
+    for pid in pids
+        push!(get!(host_worker_occupancy, whmap[pid], Vector{Int}()), occupancy[pid])
+    end
+
+    hosts = sort(collect(keys(host_worker_occupancy)))
+    for hostname in hosts
+        occupancies = host_worker_occupancy[hostname]
+        occ_string = String(_worker_occupancy_symbol.(occupancies))
+        println(io, "    host $hostname (", length(occupancies), " workers): ", occ_string)
+    end
+end
+
+function _worker_occupancy_symbol(occupancy::Int)
+    if occupancy == 0
+        _g_unicode_occupancy.sleeping
+    elseif occupancy == 1
+        _g_unicode_occupancy.working
+    elseif occupancy == 2
+        _g_unicode_occupancy.onfire
+    elseif occupancy >= 3
+        _g_unicode_occupancy.overloaded
+    else
+        _g_unicode_occupancy.unknown
+    end
+end
+
 
 function Base.length(fwp::FlexWorkerPool)
     l = length(fwp._pool)
@@ -127,15 +162,20 @@ function _use_main_pool(fwp::FlexWorkerPool)
 end
 
 function Distributed.workers(fwp::FlexWorkerPool)
-    _use_main_pool(fwp) ? workers(fwp._pool) : workers(fwp._mypid_pool)
+    lock(fwp._worker_mgmt) do
+        _use_main_pool(fwp) ? workers(fwp._pool) : workers(fwp._mypid_pool)
+    end
 end
 
 
 function Base.push!(fwp::FlexWorkerPool, pid::Int)
-    try lock(fwp._worker_mgmt)
-        if isvalid_pid(pid)
-            # Adding workers that are already in the pool must not increase oversubscription:
-            if !in(pid, fwp._worker_history)
+    if isvalid_pid(pid)
+        _register_process(pid)
+        # Adding workers that are already in the pool must not increase oversubscription:
+        if !in(pid, fwp._worker_history)                
+            lock(fwp._worker_mgmt) do
+                fwp._worker_occupancy[pid] = 0
+                push!(fwp._worker_history, pid)
                 mypid = myid()
                 if pid == mypid
                     @assert length(fwp._mypid_pool) == 0
@@ -144,33 +184,29 @@ function Base.push!(fwp::FlexWorkerPool, pid::Int)
                     end
                     return fwp
                 else
-                    ## ToDo: Re-enable greedy/background worker init?
-                    #if fwp._init_workers
-                    #    Threads.@spawn ensure_procinit_or_kill(pid)
-                    #end
-
                     # Add worker to pool only once, hold oversubscription in reserve. We
                     # want to spread it out over the worker queue:
                     push!(fwp._pool, pid)
                     if fwp._oversubscription > 1
                         push!(fwp._spares, (pid, fwp._oversubscription - 1))
                     end
-                    notify(fwp._worker_mgmt)
                 end
+                notify(fwp._worker_mgmt)
             end
-        else
-            @warn "Not adding invalid process ID $pid to $(getlabel(fwp))."
         end
-
-        return fwp
-    finally
-        unlock(fwp._worker_mgmt)
+    else
+        @warn "Not adding invalid process ID $pid to $(getlabel(fwp))."
     end
+
+    return fwp
 end
 
 
 function Base.put!(fwp::FlexWorkerPool, pid::Int)
-    pid != myid() ? put!(fwp._pool, pid) : put!(fwp._mypid_pool, pid)
+    lock(fwp._worker_mgmt) do
+        fwp._worker_occupancy[pid] -= 1
+        pid != myid() ? put!(fwp._pool, pid) : put!(fwp._mypid_pool, pid)
+    end
     return pid
 end
 
@@ -185,6 +221,9 @@ function Base.take!(fwp::FlexWorkerPool)
             catch err
                 orig_err = inner_exception(err)
                 @warn "Error while initializig process $pid, removing it." orig_err
+                lock(fwp._worker_mgmt) do
+                    fwp._worker_occupancy[pid] -= 1
+                end
                 rmprocs(pid)
                 put!(fwp, pid)
             end
@@ -203,7 +242,11 @@ function _take_worker_noinit!(fwp::FlexWorkerPool)
         try
             if _use_main_pool(fwp)
                 if length(fwp._pool) > 0
-                    return take!(fwp._pool)
+                    pid = take!(fwp._pool)
+                    lock(fwp._worker_mgmt) do
+                        fwp._worker_occupancy[pid] += 1
+                    end
+                    return pid
                 else
                     yield()
                     lock(fwp._worker_mgmt) do
@@ -213,7 +256,11 @@ function _take_worker_noinit!(fwp::FlexWorkerPool)
                     end
                 end
             else
-                return take!(fwp._mypid_pool)
+                pid = take!(fwp._mypid_pool)
+                lock(fwp._worker_mgmt) do
+                    fwp._worker_occupancy[pid] += 1
+                end
+                return pid
             end
         catch err
             if err isa ErrorException && length(fwp._pool) == 0

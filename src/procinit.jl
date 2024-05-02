@@ -29,6 +29,38 @@ operations that concern the management of all processes.
 
 const _g_allprocsmgmt_lock = ReentrantLock()
 
+const _g_worker_hosts = IdDict{Int,String}()
+
+function _register_process(pid::Int)
+    registered, pidlock = lock(allprocs_management_lock()) do
+        return haskey(_g_worker_hosts, pid), proc_management_lock(pid)
+    end
+    if !registered
+        lock(pidlock) do
+            full_hostname = if pid == myid()
+                Base.gethostname()
+            else
+                remotecall_fetch(Base.gethostname, pid)
+            end
+            hostname = String(first(split(full_hostname, ".")))
+
+            # # ToDo: init worker already or not?
+            # waitall(ensure_procinit_or_kill(pid))
+
+            lock(allprocs_management_lock()) do
+                _g_worker_hosts[pid] = hostname
+            end
+        end
+    end
+    return nothing
+end
+
+function _worker_hosts()
+    lock(allprocs_management_lock()) do
+        return deepcopy(_g_worker_hosts)
+    end
+end
+
 
 """
     ParallelProcessingTools.proc_management_lock(pid::Integer)::ReentrantLock

@@ -120,25 +120,10 @@ By default ensures that all workers processes use the same Julia project
 environment as the current process (requires that file systems paths are
 consistenst across compute hosts).
 
-Use [`@always_everywhere`](@ref) to run initialization code on all current
-processes and all future processes added via `addworkers`:
+Example:
 
 ```julia
-using Distributed, ParallelProcessingTools
-
-@always_everywhere begin
-    using SomePackage
-    import SomeOtherPackage
-
-    get_global_value() = 42
-end
-
-# ... some code ...
-
 addworkers(LocalProcesses(nprocs = 4))
-
-# `get_global_value` is available even though workers were added later:
-remotecall_fetch(get_global_value, last(workers()))
 ```
 
 See also [`worker_resources()`](@ref).
@@ -169,7 +154,7 @@ function addworkers(
     @nospecialize(pool::Union{AbstractWorkerPool,Nothing})
 )
     n_workers = mode.nprocs
-    try
+    new_workers = try
         lock(allprocs_management_lock())
 
         @info "Adding $n_workers Julia processes on current host"
@@ -180,14 +165,28 @@ function addworkers(
         julia_project = dirname(Pkg.project().path)
         worker_nthreads = nthreads()
 
-        new_workers = Distributed.addprocs(
+        Distributed.addprocs(
             n_workers,
             exeflags = `--project=$julia_project --threads=$worker_nthreads`
         )
-
-        @info "Added $(length(new_workers)) Julia worker processes on current host"
     finally
         unlock(allprocs_management_lock())
+    end
+
+    _register_new_workers(new_workers, pool)
+    @info "Added $(length(new_workers)) Julia worker processes on current host"
+end
+
+
+function _register_new_workers(
+    new_workers::AbstractVector{<:Integer},
+    @nospecialize(pool::Union{AbstractWorkerPool,Nothing})
+)
+    if !isnothing(pool)
+        @info "Adding $(length(new_workers)) to worker pool $(getlabel(pool))"
+        @sync for pid in new_workers
+            Threads.@spawn push!(pool, pid)
+        end
     end
 end
 
@@ -334,7 +333,7 @@ function addworkers(
     mode::ElasticAddProcsMode,
     @nospecialize(pool::Union{AbstractWorkerPool,Nothing})
 )
-    try
+    new_workers = try
         lock(allprocs_management_lock())
 
         manager = default_elastic_manager()
@@ -386,15 +385,17 @@ function addworkers(
 
         new_workers = setdiff(Distributed.workers(), old_procs)
         n_new = length(new_workers)
-
-        @info "Added $n_new new Julia worker processes"
-
         if n_new != n_to_add
             throw(ErrorException("Tried to add $n_to_add new workers, but added $n_new"))
         end
+        new_workers
     finally
         unlock(allprocs_management_lock())
     end
+
+    _register_new_workers(new_workers, pool)
+
+    @info "Added $(length(new_workers)) new Julia worker processes"
 end
 
 

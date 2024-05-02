@@ -20,6 +20,7 @@ using Logging: @logmsg, LogLevel, Info, Debug
 using ArgCheck: @argcheck
 using Parameters: @with_kw
 
+include("display.jl")
 include("waiting.jl")
 include("exceptions.jl")
 include("states.jl")
