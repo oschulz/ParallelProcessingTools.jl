@@ -185,26 +185,9 @@ function addworkers(
             exeflags = `--project=$julia_project --threads=$worker_nthreads`
         )
 
-        _init_new_workers(new_workers, pool)
-
         @info "Added $(length(new_workers)) Julia worker processes on current host"
     finally
         unlock(allprocs_management_lock())
-    end
-end
-
-
-function _init_new_workers(
-    new_workers::AbstractVector{<:Integer},
-    @nospecialize(pool::Union{AbstractWorkerPool,Nothing})
-)
-    @info "Sending initialization code to $(length(new_workers)) new worker processes"
-    r = ensure_procinit(new_workers)
-    wait_for_all(values(r))
-
-    if !isnothing(pool)
-        @info "Adding $(length(new_workers)) to worker pool $(getlabel(pool))"
-        foreach(Base.Fix1(push!, pool), new_workers)
     end
 end
 
@@ -364,10 +347,6 @@ function addworkers(
     
         sleep(1)
 
-        # ToDo: Add timeout and either prevent workers from connecting after
-        # or somehow make sure that init and @always everywhere code is still
-        # run on them before user code is executed on them.
-
         timeout = elastic_addprocs_timeout(mode)
 
         t_start = time()
@@ -407,8 +386,6 @@ function addworkers(
 
         new_workers = setdiff(Distributed.workers(), old_procs)
         n_new = length(new_workers)
-
-        _init_new_workers(new_workers, pool)
 
         @info "Added $n_new new Julia worker processes"
 
