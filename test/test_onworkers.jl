@@ -61,7 +61,7 @@ end
     @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(gen_mayfail(1), "bar"; tries = 2, label = "mayfail")
     @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(mytask, 2, "foo", time = 0.5, tries = 2)
     
-    addworkers(LocalProcesses(2))
+    addworkers(OnLocalhost(2))
     @test nprocs() == 3
     resources = worker_resources()
     @test length(resources) == 2
@@ -86,7 +86,7 @@ end
     @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(mytask, 2, "foo", time = 0.5, tries = 2)
     @test nprocs() == 1
 
-    addworkers(LocalProcesses(2))
+    addworkers(OnLocalhost(2))
 
     @test @inferred(onworker(mytask)) == ()
     @test @inferred(onworker(mytask, 1, "foo")) == ("foo", )

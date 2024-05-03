@@ -91,7 +91,7 @@ end
     @test sort(pids) == repeat([myid()], 3)
     foreach(pid -> put!(pool2, pid), pids)
 
-    pool3 = default_flex_worker_pool()
+    pool3 = ppt_worker_pool()
     @test pool3 isa FlexWorkerPool
     @test workers(pool3) == [myid()]
 end

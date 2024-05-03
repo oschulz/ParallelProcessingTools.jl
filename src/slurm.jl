@@ -5,8 +5,8 @@
         slurm_flags::Cmd = {defaults}
         julia_flags::Cmd = {defaults}
         dir = pwd()
-        user_start::Bool = false
-        timeout::Real = 60
+        worker_timeout::Real = 60
+        redirect_output::Bool = true
     )
 
 Mode to add worker processes via SLURM `srun`.
@@ -20,31 +20,37 @@ Workers are started with current directory set to `dir`.
 Example:
 
 ```julia
-mode = SlurmRun(slurm_flags = `--ntasks=4 --cpus-per-task=8 --mem-per-cpu=8G`)
-addworkers(mode)
+runmode = SlurmRun(slurm_flags = `--ntasks=4 --cpus-per-task=8 --mem-per-cpu=8G`)
+task = runworkers(runmode)
+
+Threads.@async begin
+    wait(task)
+    @info "SLURM workers have terminated."
+end
+
+@wait_while nprocs()-1 < n
 ```
 
-If `user_start` is `true`, then the SLURM srun-command will not be run
-automatically, instead it will be logged via `@info` and the user is
-responsible for running it. This srun-command can also be retrieved via
-[`worker_start_command(mode)`](@ref).
+Workers can also be started manually, use
+[`worker_start_command(runmode)`](@ref) to get the `srun` start command and
+run it from a separate process or so.
 """
-@with_kw struct SlurmRun <: ElasticAddProcsMode
+@with_kw struct SlurmRun <: DynamicAddProcsMode
     slurm_flags::Cmd = _default_slurm_flags()
     julia_flags::Cmd = _default_julia_flags()
     dir = pwd()
-    user_start::Bool = false
-    timeout::Real = 60
+    worker_timeout::Float64 = 60
+    redirect_output::Bool = true
 end
 export SlurmRun
 
 
 const _g_slurm_nextjlstep = Base.Threads.Atomic{Int}(1)
 
-function worker_start_command(mode::SlurmRun, manager::ClusterManagers.ElasticManager)
-    slurm_flags = mode.slurm_flags
-    julia_flags = mode.julia_flags
-    dir = mode.dir
+function worker_start_command(runmode::SlurmRun, manager::ClusterManagers.ElasticManager)
+    slurm_flags = runmode.slurm_flags
+    julia_flags = runmode.julia_flags
+    dir = runmode.dir
 
     tc = _get_slurm_taskconf(slurm_flags, ENV)
 
@@ -61,7 +67,11 @@ function worker_start_command(mode::SlurmRun, manager::ClusterManagers.ElasticMa
     jlstep = atomic_add!(_g_slurm_nextjlstep, 1)
     jobname = "julia-$(getpid())-$jlstep"
 
-    worker_cmd = elastic_localworker_startcmd(manager; julia_flags = `$julia_flags $additional_julia_flags`)
+    worker_cmd = worker_local_startcmd(
+        manager;
+        julia_flags = `$julia_flags $additional_julia_flags`,
+        redirect_output = runmode.redirect_output, worker_timeout = runmode.worker_timeout
+    )
 
     return `srun --job-name=$jobname --chdir=$dir $slurm_flags $worker_cmd`, n_workers
 end
@@ -89,20 +99,16 @@ function _slurm_mem_per_task(tc::NamedTuple)
 end
 
 
-function ParallelProcessingTools.start_elastic_workers(mode::SlurmRun, manager::ClusterManagers.ElasticManager)
-    srun_cmd, n_workers = worker_start_command(mode, manager)
-    if mode.user_start
-        @info "To add Julia worker processes (I'll wait for them), run: $srun_cmd"
-        return n_workers, missing
-    else
-        @info "Starting SLURM job: $srun_cmd"
-        srun_proc = open(srun_cmd)
-        return n_workers, srun_proc
+function ParallelProcessingTools.runworkers(runmode::SlurmRun, manager::ClusterManagers.ElasticManager)
+    srun_cmd, n = worker_start_command(runmode, manager)
+    @info "Starting SLURM job: $srun_cmd"
+    task = Threads.@async begin
+        process = open(srun_cmd)
+        wait(process)
+        @info "SLURM job terminated: $srun_cmd"
     end
+    return task, n
 end
-
-
-elastic_addprocs_timeout(mode::SlurmRun) = mode.timeout
 
 
 function _default_slurm_flags()

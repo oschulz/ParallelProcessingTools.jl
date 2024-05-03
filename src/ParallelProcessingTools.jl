@@ -33,7 +33,7 @@ include("workpartition.jl")
 include("procinit.jl")
 include("workerpool.jl")
 include("onworkers.jl")
-include("addworkers.jl")
+include("runworkers.jl")
 include("slurm.jl")
 include("deprecated.jl")
 

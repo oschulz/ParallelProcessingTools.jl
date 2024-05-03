@@ -216,7 +216,7 @@ function Base.take!(fwp::FlexWorkerPool)
         pid::Int = _take_worker_noinit!(fwp)
         if fwp._init_workers
             try
-                wait_for_all(ensure_procinit(pid))
+                ensure_procinit(pid)
                 return pid
             catch err
                 orig_err = inner_exception(err)
@@ -330,15 +330,14 @@ const _g_default_wp = Ref{Union{AbstractWorkerPool,Nothing}}(nothing)
 const _g_default_wp_lock = ReentrantLock()
 
 """
-    default_flex_worker_pool()
+    ppt_worker_pool()
 
-Returns the default flexible worker pool, an instance of
-[`FlexWorkerPool`](@ref).
+Returns the default ParallelProcessingTools worker pool.
 
 If the default instance doesn't exist yet, then a `FlexWorkerPool` will be
 created that initially contains `Distributed.myid()` as the only worker.
 """
-function default_flex_worker_pool()
+function ppt_worker_pool()
     lock(_g_default_wp_lock)
     wp = _g_default_wp[]
     unlock(_g_default_wp_lock)
@@ -346,7 +345,7 @@ function default_flex_worker_pool()
         lock(_g_default_wp_lock) do
             wp = _g_default_wp[]
             if isnothing(wp)
-                return default_flex_worker_pool!(FlexWorkerPool(label = "auto_default_flex_worker_pool"))
+                return ppt_worker_pool!(FlexWorkerPool(label = "auto_default_flex_worker_pool"))
             else
                 return wp
             end
@@ -355,17 +354,17 @@ function default_flex_worker_pool()
         return wp
     end
 end
-export default_flex_worker_pool
+export ppt_worker_pool
 
 
 """
-    default_flex_worker_pool!(wp::FlexWorkerPool)
+    ppt_worker_pool!(wp::FlexWorkerPool)
 
-Sets the default flexible worker pool to `wp` and returns it.
+Sets the default ParallelProcessingTools worker pool to `wp` and returns it.
 
-See [`default_flex_worker_pool()`](@ref).
+See [`ppt_worker_pool()`](@ref).
 """
-function default_flex_worker_pool!(fwp::FlexWorkerPool)
+function ppt_worker_pool!(fwp::FlexWorkerPool)
     lock(_g_default_wp_lock) do
         lock(allprocs_management_lock()) do
             _g_default_wp[] = fwp
@@ -373,4 +372,4 @@ function default_flex_worker_pool!(fwp::FlexWorkerPool)
         end
     end
 end
-export default_flex_worker_pool!
+export ppt_worker_pool!

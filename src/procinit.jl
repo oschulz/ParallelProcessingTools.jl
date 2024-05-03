@@ -44,9 +44,6 @@ function _register_process(pid::Int)
             end
             hostname = String(first(split(full_hostname, ".")))
 
-            # # ToDo: init worker already or not?
-            # waitall(ensure_procinit_or_kill(pid))
-
             lock(allprocs_management_lock()) do
                 _g_worker_hosts[pid] = hostname
             end
@@ -176,10 +173,11 @@ end
 
 
 """
-    ParallelProcessingTools.add_procinit_code(expr)
+    ParallelProcessingTools.add_procinit_code(expr; run_everywhere::Bool = false)
 
 Add `expr` to process init code. `expr` is run on the current proccess
-immediately, but not automatically on remote processes.
+immediately, but not automatically on remote processes unless `run_everywhere`
+is `true`.
 
 User code should typically not need to call this function, but should use
 [`@always_everywhere`](@ref) instead.
@@ -187,7 +185,7 @@ User code should typically not need to call this function, but should use
 See also [`ParallelProcessingTools.get_procinit_code`](@ref) and
 [`ParallelProcessingTools.ensure_procinit`](@ref).
 """
-@noinline function add_procinit_code(init_code)
+@noinline function add_procinit_code(init_code; run_everywhere::Bool = false)
     try
         lock(allprocs_management_lock())
 
@@ -204,6 +202,10 @@ See also [`ParallelProcessingTools.get_procinit_code`](@ref) and
         return nothing
     finally
         unlock(allprocs_management_lock())
+    end
+
+    if run_everywhere
+        ensure_procinit_or_kill(pids)
     end
 end
 
@@ -276,30 +278,18 @@ end
 
 
 """
-    ParallelProcessingTools.ensure_procinit(pid::Integer)
-    ParallelProcessingTools.ensure_procinit(pids::AbstractVector{<:Integer})
+    ensure_procinit(pid::Int)
+    ensure_procinit(pids::AbstractVector{Int} = workers())
 
-Run process initialization code on the given process or processes
-necessary.
-
-Initialization of the current process is run immediately.
-
-Initialization of remote processes is run asynchronously. When called with a
-single `pid`, returns either a `Task` or `nothing`, depending on whether
-initialization was necessary. When called with several `pids`, returns an
-`IdDict{Int,Task}` that contains the processes for which initialization was
-necessary. The task(s) returned can be awaited to ensure that initialization
-of the process(es) is complete.
+Run process initialization code on the given process(es) if necessary,
+returns after initialization is complete.
 
 If you want to ensure no initialization code is added while remote process
 initialization is incomplete, you can `lock(allprocs_management_lock())` while
 waiting for the initialization task(s). When using an
-[`ElasticWorkerPool`](@ref), worker initialization can safely be run in the
-background though, as the pool will only let you take workers that have
-been fully initialized.
-
-User code should typically not need to call `ensure_procinit` but should use
-[`@always_everywhere`](@ref) instead.
+[`FlexWorkerPool`](@ref), worker initialization can safely be run in the
+background though, as the pool will only offer workers (via `take!(pool)`)
+after it has fully initialized them.
 
 See also [`ParallelProcessingTools.get_procinit_code`](@ref)
 and [`ParallelProcessingTools.add_procinit_code`](@ref).
@@ -310,94 +300,69 @@ See also [`ParallelProcessingTools.get_procinit_code`](@ref),
 [`ParallelProcessingTools.current_procinit_level`](@ref).
 """
 function ensure_procinit end
-
-ensure_procinit(pid::Integer) = ensure_procinit(Int(pid))
+export ensure_procinit
 
 @noinline function ensure_procinit(pid::Int)
-    try
-        lock(allprocs_management_lock())
-
+    init_level, pid_lock = lock(allprocs_management_lock()) do
         _initial_init_current_process()
-
-        if pid != myid()
-            init_level = global_procinit_level()
-            pid_lock = proc_management_lock(pid)
-            try
-                lock(pid_lock)
-
-                pid_initlvl = _g_procmgmt_initlvl[pid]
-                if pid_initlvl < init_level
-                    wrapped_init_code = _g_wrapped_procinit_code
-                    init_task = _init_single_process(pid, pid_lock, init_level, wrapped_init_code)
-                    return init_task::Task
-                else
-                    return nothing
-                end
-            finally
-                unlock(pid_lock)
-            end
-        else
-            # Current process should always be initialized already
-            return nothing
-        end
-    finally
-        unlock(allprocs_management_lock())
+        global_procinit_level(), proc_management_lock(pid)
     end
 
-    return task
+    if pid != myid()
+        lock(pid_lock) do
+            pid_initlvl = _g_procmgmt_initlvl[pid]
+            if pid_initlvl < init_level
+                wrapped_init_code = _g_wrapped_procinit_code
+                _init_single_process(pid, pid_lock, init_level, wrapped_init_code)
+            end
+        end
+    else
+        # Nothing to do: Current process should always be initialized already
+    end
+    return nothing
 end
 
 @noinline function _init_single_process(pid::Int, pid_lock::ReentrantLock, init_level::Int, wrapped_init_code::Expr)
-    task = Threads.@spawn begin
-        try
-            lock(pid_lock)
+    try
+        @debug "Initializing process $pid to init level $init_level."
+        lock(pid_lock)
 
-            # ToDo: Maybe use fetch with timeout?
-            remotecall_fetch(Core.eval, pid, Main, wrapped_init_code)
+        # ToDo: Maybe use fetch with timeout?
+        remotecall_fetch(Core.eval, pid, Main, wrapped_init_code)
 
-            _g_procmgmt_initlvl[pid] = init_level
-            #@debug "Initialization of process $pid to init level $init_level complete."
-        catch err
-            orig_err = inner_exception(err)
-            @error "Error while running init code on process $pid:" orig_err
-            throw(err)
-        finally
-            unlock(pid_lock)
-        end
+        _g_procmgmt_initlvl[pid] = init_level
+        #@debug "Initialization of process $pid to init level $init_level complete."
+    catch err
+        orig_err = inner_exception(err)
+        @error "Error while running init code on process $pid:" orig_err
+        throw(err)
+    finally
+        unlock(pid_lock)
     end
-    return task
+    return nothing
 end
 
-
-function ensure_procinit(@nospecialize(procs::AbstractVector{<:Integer}))
-    try
-        lock(allprocs_management_lock())
-
-        init_tasks = IdDict{Int,Task}()
-        for pid in procs
-            init_task = ensure_procinit(pid)
-            if !isnothing(init_task)
-                init_tasks[pid] = init_task
-            end
-        end
-        return init_tasks   
-    finally
-        unlock(allprocs_management_lock())
+@noinline function ensure_procinit(pids::AbstractVector{Int} = workers())
+    @sync for pid in pids
+        Threads.@spawn ensure_procinit(pid)
     end
 end
 
 
 """
     ParallelProcessingTools.ensure_procinit_or_kill(pid::Int)
+    ParallelProcessingTools.ensure_procinit_or_kill(pids::AbstractVector{Int} = workers())
 
-Ensure Julia process `pid` is either initialized successfully, or killed and
-removed if the initialization fails.
+Run process initialization code on the given process(es) if necessary, kill
+and remove process(es) for which initialization fails.
 
 See also [`ParallelProcessingTools.ensure_procinit`](@ref).
 """
+function ensure_procinit_or_kill end
+
 function ensure_procinit_or_kill(pid::Int)
     try
-        wait_for_all(ensure_procinit(pid))
+        ensure_procinit(pid)
     catch err
         orig_err = inner_exception(err)
         @warn "Error while initializig process $pid, removing it." orig_err
@@ -406,23 +371,24 @@ function ensure_procinit_or_kill(pid::Int)
     return nothing
 end
 
+@noinline function ensure_procinit_or_kill(pids::AbstractVector{Int} = workers())
+    @sync for pid in pids
+        Threads.@spawn ensure_procinit_or_kill(pid)
+    end
+end
 
 
 """
     @always_everywhere(expr)
 
 Runs `expr` on all current Julia processes, but also all future Julia
-processes added via [`addworkers`](@ref)) and/or added to an
-[`ElasticWorkerPool`](@ref).
+processes after an [`ensure_procinit()`](@ref)) when managed using a
+[`FlexWorkerPool`](@ref).
 
 Similar to `Distributed.everywhere`, but also stores `expr` so that
-`addworkers` can execute it automatically on new worker processes.
+`ensure_procinit` can execute it on future worker processes.
 
-`expr` is run immediately on the current process, but asynchronously on
-remote processes. `@always_everywhere` returns a `Task` that can be awaited
-to ensure all remote processes have been initialized.
-
-Asynchronous example:
+Example:
 
 ```julia
 @always_everywhere begin
@@ -433,14 +399,6 @@ Asynchronous example:
 end
 ```
 
-Synchronous example:
-
-```julia
-wait(@always_everywhere begin
-    using YetAnotherPackage
-end)
-```
-
 See also [`ParallelProcessingTools.add_procinit_code`](@ref) and
 [`ParallelProcessingTools.ensure_procinit`](@ref).
 """
@@ -448,22 +406,7 @@ macro always_everywhere(ex)
     # Code partially taken from Distributed.@everywhere
     quote
         let ex = Expr(:toplevel, :(task_local_storage()[:SOURCE_PATH] = $(get(task_local_storage(), :SOURCE_PATH, nothing))), $(esc(Expr(:quote, ex))))
-            try
-                lock(allprocs_management_lock())
-    
-                add_procinit_code(ex)
-                init_dict = ensure_procinit(Distributed.procs())
-
-                # Wait for initialization of all remote processes
-
-                remote_init_task = let objs_to_wait_for = collect(values(init_dict))
-                    Threads.@spawn wait_for_all(objs_to_wait_for)
-                end
-
-                remote_init_task
-            finally
-                unlock(allprocs_management_lock())
-            end
+            add_procinit_code(ex, run_everywhere = true)
         end
     end
 end

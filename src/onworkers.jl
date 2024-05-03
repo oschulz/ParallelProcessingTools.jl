@@ -35,7 +35,7 @@ _should_retry(err::RemoteException) = _should_retry(err.captured.ex)
 """
     onworker(
         f::Function, args...;
-        pool::AbstractWorkerPool = default_flex_worker_pool(),
+        pool::AbstractWorkerPool = ppt_worker_pool(),
         maxtime::Real = 0, tries::Integer = 1, label::AbstractString = ""
     )
 
@@ -60,7 +60,7 @@ export onworker
 
 function onworker(
     f::Function;
-    @nospecialize(pool::AbstractWorkerPool = default_flex_worker_pool()),
+    @nospecialize(pool::AbstractWorkerPool = ppt_worker_pool()),
     @nospecialize(maxtime::Real = 0), @nospecialize(tries::Integer = 1), @nospecialize(label::AbstractString = "")
 )
     R = _return_type(f, ())
@@ -70,7 +70,7 @@ end
 
 function onworker(
     f::Function, arg1, args...;
-    @nospecialize(pool::AbstractWorkerPool = default_flex_worker_pool()),
+    @nospecialize(pool::AbstractWorkerPool = ppt_worker_pool()),
     @nospecialize(maxtime::Real = 0), @nospecialize(tries::Integer = 1), @nospecialize(label::AbstractString = "")
 )
     all_args = (arg1, args...)
