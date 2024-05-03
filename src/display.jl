@@ -22,6 +22,15 @@ const _g_unicode_occupancy = (
     unknown = '❓'
 )
 
+
+"""
+    ParallelProcessingTools.in_vscode_notebook():Bool
+
+Test if running within a Visual Studio Code notebook.
+"""
+in_vscode_notebook() = haskey(ENV, "VSCODE_CWD")
+
+
 """
     ParallelProcessingTools.printover(f_show::Function, io::IOBuffer)
 
@@ -29,10 +38,16 @@ Runs `f_show(tmpio)` with an IO buffer, then clears the required number of
 lines on `io` (typically `stdout`) and prints the output over them.
 """
 function printover(f_show, io)
+    vscode_nb_mode = in_vscode_notebook()
+
     tmpio = IOBuffer()
     f_show(tmpio)
     seekstart(tmpio)
     output_lines = readlines(tmpio)
+    if vscode_nb_mode
+        output_lines = [join(strip.(output_lines), " | ")]
+    end
+
     n_lines = length(output_lines)
     _move_cursor_up_while_clearing_lines(io, n_lines)
     for l in output_lines
@@ -81,7 +96,8 @@ end
 function watch_show(io::IO, @nospecialize(obj::Any), @nospecialize(interval::Real = 1))
     while true
         printover(io) do tmpio
-            ioctx = IOContext(tmpio, :compact => false)
+            vscode_nb_mode = in_vscode_notebook()
+            ioctx = IOContext(tmpio, :compact => vscode_nb_mode)
             show(ioctx,  MIME"text/plain"(), obj)
         end
         sleep(interval)
