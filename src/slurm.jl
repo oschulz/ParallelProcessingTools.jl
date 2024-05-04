@@ -115,7 +115,7 @@ end
 
 const _slurm_memunits = IdDict{Char,Int}('K' => 1024^1, 'M' => 1024^2, 'G' => 1024^3, 'T' => 1024^4)
 
-const _slurm_memsize_regex = r"^([0-9]+)([KMGT])?$"
+const _slurm_memsize_regex = r"^([0-9]+)(([KMGT])B?)?$"
 function _slurm_parse_memoptval(memsize::AbstractString)
     s = strip(memsize)
     m = match(_slurm_memsize_regex, s)
@@ -123,7 +123,7 @@ function _slurm_parse_memoptval(memsize::AbstractString)
         throw(ArgumentError("Invalid SLURM memory size specification \"$s\""))
     else
         value = parse(Int, m.captures[1])
-        unitchar = only(something(m.captures[2], 'M'))
+        unitchar = only(something(m.captures[3], 'M'))
         unitmult = _slurm_memunits[unitchar]
         return value * unitmult
     end
