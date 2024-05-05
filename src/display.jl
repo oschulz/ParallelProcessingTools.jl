@@ -81,20 +81,28 @@ end
 
 
 """
-    watch_show(obj, interval::Real = 1)
-    watch_show(io::IO, obj, interval::Real = 1)
+    keep_showing(obj; stop::Function = ()->false, interval::Real = 1)
+    keep_showing(io::IO, obj; stop::Function = ()->false, interval::Real = 1)
 
-Show `obj` every `interval` seconds.
+Show `obj` (to `io`) every `interval` seconds while `stop()` returns `false`.
+
+Tries to use screen-printover.
 """
-function watch_show end
-export watch_show
+function keep_showing end
+export keep_showing
 
-function watch_show(@nospecialize(obj::Any), @nospecialize(interval::Real = 1))
-    watch_show(stdout, obj, interval)
+function keep_showing(
+    @nospecialize(obj::Any);
+    @nospecialize(stop::Function = ()->false), @nospecialize(interval::Real = 1)
+)
+    keep_showing(stdout, obj; stop = stop, interval = interval)
 end
 
-function watch_show(io::IO, @nospecialize(obj::Any), @nospecialize(interval::Real = 1))
-    while true
+function keep_showing(
+    io::IO, @nospecialize(obj::Any);
+    @nospecialize(stop::Function = ()->false), @nospecialize(interval::Real = 1)
+)
+    while !stop()
         printover(io) do tmpio
             vscode_nb_mode = in_vscode_notebook()
             ioctx = IOContext(tmpio, :compact => vscode_nb_mode)
