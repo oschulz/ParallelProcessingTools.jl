@@ -2,19 +2,24 @@
 
 """
     FlexWorkerPool{WP<:AbstractWorkerPool}(
-        worker_pids::AbstractVector{Int} = [Distributed.myid()];
-        maxoccupancy::Int = 1, init_workers::Bool = true
+        worker_pids::AbstractVector{Int};
+        label::AbstractString = "", maxoccupancy::Int = 1, init_workers::Bool = true
     )::AbstractWorkerPool
+
+    FlexWorkerPool(; caching = false, withmyid::Bool = true, kwargs...)
 
 An flexible worker pool, intended to work with cluster managers that may
 add and remove Julia processes dynamically.
 
-If the current process (`Distributed.myid()`) is part of the pool, it will
-only be used as a fallback while no other processes are members of the pool
-(e.g. because no other processes have been added yet or because all other
-processes in the pool have terminated and been removed from it). The
-current process will *not* be used as a fallback because all other workers
-are currently in use.
+If the current process (`Distributed.myid()`) is part of the pool, resp. if
+`withmyid` is `true`, it will be used as a fallback when no other workers are
+in are members of the pool (e.g. because no other processes have been added
+yet or because all other processes in the pool have terminated and been
+removed from it). The current process will *not* be used as a fallback when
+all other workers are currently in use.
+
+If `caching` is true, the pool will use a `Distributed.CachingPool` as the
+underlying pool, otherwise a `Distributed.WorkerPool`.
 
 If `maxoccupancy`is greater than one, individual workers can be used
 `maxoccupancy` times in parallel. So `take!(pool)` may return the same process
@@ -38,22 +43,25 @@ Example:
 ```julia
 using ParallelProcessingTools, Distributed
 
-pool = FlexWorkerPool(maxoccupancy = 2)
+pool = FlexWorkerPool(withmyid = true, maxoccupancy = 3)
+
+workers(pool)
 
 pids = [take!(pool) for _ in 1:3]
-pids == repeat([myid()], 3)
+@assert pids == repeat([myid()], 3)
 foreach(pid -> put!(pool, pid), pids)
 
 addprocs(4)
 worker_procs = workers()
+push!.(Ref(pool), worker_procs)
 
 pids = [take!(pool) for _ in 1:4*3]
-pids == repeat(worker_procs, 3)
-foreach(pid -> put(pool, pid), pids)
+@assert pids == repeat(worker_procs, 3)
+foreach(pid -> put!(pool, pid), pids)
 rmprocs(worker_procs)
 
 pids = [take!(pool) for _ in 1:3]
-pids == repeat(myid(), 3)
+@assert pids == repeat([myid()], 3)
 foreach(pid -> put!(pool, pid), pids)
 ```
 """
@@ -97,8 +105,10 @@ function FlexWorkerPool{WP}(
     return fwp
 end
 
-function FlexWorkerPool(worker_pids::AbstractVector{Int} = [Distributed.myid()]; kwargs...)
-    return FlexWorkerPool{WorkerPool}(worker_pids; kwargs...)
+function FlexWorkerPool(; caching = false, withmyid::Bool = true, kwargs...)
+    worker_pids = withmyid ? Int[Distributed.myid()] : Int[]
+    WP = caching ? CachingPool : WorkerPool
+    FlexWorkerPool{WP}(worker_pids; kwargs...)
 end
 
 
