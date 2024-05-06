@@ -185,6 +185,42 @@ export worker_start_command
 worker_start_command(runmode::DynamicAddProcsMode) = worker_start_command(runmode, ppt_cluster_manager())
 
 
+"""
+    write_worker_start_script(
+        filename::AbstractString,
+        runmode::DynamicAddProcsMode,
+        manager::ClusterManager = ParallelProcessingTools.ppt_cluster_manager()
+    )
+
+Writes the system command to start worker processes to a shell script.
+"""
+function write_worker_start_script(
+    filename::AbstractString,
+    runmode::DynamicAddProcsMode,
+    manager::ClusterManager = ParallelProcessingTools.ppt_cluster_manager()
+)
+    wstartcmd, _ = worker_start_command(runmode, manager)
+    _, ext = split_basename_ext(basename(filename))
+    if Sys.iswindows()
+        if ext == ".bat" || ext == ".BAT"
+            write(filename, Base.shell_escape_wincmd(wstartcmd))
+        else
+            throw(ArgumentError("Script filename extension \"$ext\" not supported on Windows.")) 
+        end
+    else
+        if ext == ".sh"
+            open(filename, "w") do io
+                chmod(filename, 0o700)
+                write(io, Base.shell_escape_posixly(wstartcmd))
+            end
+        else
+            throw(ArgumentError("Script filename extension \"$ext\" not supported on Posix-like OS.")) 
+        end
+    end
+end
+export write_worker_start_script
+
+
 function _elastic_worker_startjl(manager::ClusterManagers.ElasticManager, redirect_output::Bool, worker_timeout::Real)
     cookie = Distributed.cluster_cookie()
     socket_name = manager.sockname
