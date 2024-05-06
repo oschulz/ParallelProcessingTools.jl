@@ -3,10 +3,8 @@
 """
     FlexWorkerPool{WP<:AbstractWorkerPool}(
         worker_pids::AbstractVector{Int} = [Distributed.myid()];
-        oversubscription::Int = 1, init_workers::Bool = true
+        maxoccupancy::Int = 1, init_workers::Bool = true
     )::AbstractWorkerPool
-
-    FlexWorkerPool(args...; kwargs...)
 
 An flexible worker pool, intended to work with cluster managers that may
 add and remove Julia processes dynamically.
@@ -18,13 +16,15 @@ processes in the pool have terminated and been removed from it). The
 current process will *not* be used as a fallback because all other workers
 are currently in use.
 
-Values greater than zero for `oversubscription` will the same workers in
-be used `oversubscription` times in parallel. So `take!(pool)` may return
-the same process ID `pid` multiple times without a `put!(pool, pid)` in
-between. A moderate oversubscription can be useful to reduce idle times on
-workers, e.g. when functions running on the workers are blocked waiting for
-I/O. Note: Workers still need to be put back the same number of times they
-were taken from the pool, in total.
+If `maxoccupancy`is greater than one, individual workers can be used
+`maxoccupancy` times in parallel. So `take!(pool)` may return the same process
+ID `pid` multiple times without a `put!(pool, pid)` in between. Such a
+(ideally moderate) oversubscription can be useful to reduce latency-related
+idle times on workers: e.g. if communication latency to the worker
+is not short compared the the runtime of the function called on them. Or if
+the remote functions are often blocked waiting for I/O. Note: Workers still
+must be put back the same number of times they were taken from the pool,
+in total.
 
 If `init_workers` is `true`, workers taken from the pool will be guaranteed
 to be initialized to the current global initialization level
@@ -38,7 +38,7 @@ Example:
 ```julia
 using ParallelProcessingTools, Distributed
 
-pool = FlexWorkerPool(oversubscription = 2)
+pool = FlexWorkerPool(maxoccupancy = 2)
 
 pids = [take!(pool) for _ in 1:3]
 pids == repeat([myid()], 3)
@@ -61,7 +61,7 @@ struct FlexWorkerPool{WP<:AbstractWorkerPool} <: AbstractWorkerPool
     _pool::WP
     _mypid_pool::WorkerPool
     _label::String
-    _oversubscription::Int
+    _maxoccupancy::Int
     _init_workers::Bool
     _spares::Channel{Tuple{Int,Int}}
     _worker_mgmt::Threads.Condition
@@ -74,9 +74,9 @@ export FlexWorkerPool
 function FlexWorkerPool{WP}(
     worker_pids::AbstractVector{Int} = [Distributed.myid()];
     label::AbstractString = "",
-    oversubscription::Int = 1, init_workers::Bool = true
+    maxoccupancy::Int = 1, init_workers::Bool = true
 ) where {WP <: AbstractWorkerPool}
-    @argcheck oversubscription >= 1
+    @argcheck maxoccupancy >= 1
 
     pool = WP(Int[])
     mypid_pool = WorkerPool(Int[])
@@ -86,7 +86,7 @@ function FlexWorkerPool{WP}(
     _worker_occupancy = IdDict{Int,Int}()
 
     fwp = FlexWorkerPool{WP}(
-        pool, mypid_pool, label, oversubscription, init_workers,
+        pool, mypid_pool, label, maxoccupancy, init_workers,
         spares, worker_mgmt, worker_history, _worker_occupancy
     )
 
@@ -171,7 +171,7 @@ end
 function Base.push!(fwp::FlexWorkerPool, pid::Int)
     if isvalid_pid(pid)
         _register_process(pid)
-        # Adding workers that are already in the pool must not increase oversubscription:
+        # Adding workers that are already in the pool must not increase maxoccupancy:
         if !in(pid, fwp._worker_history)                
             lock(fwp._worker_mgmt) do
                 fwp._worker_occupancy[pid] = 0
@@ -179,16 +179,16 @@ function Base.push!(fwp::FlexWorkerPool, pid::Int)
                 mypid = myid()
                 if pid == mypid
                     @assert length(fwp._mypid_pool) == 0
-                    for _ in 1:fwp._oversubscription
+                    for _ in 1:fwp._maxoccupancy
                         push!(fwp._mypid_pool, mypid)
                     end
                     return fwp
                 else
-                    # Add worker to pool only once, hold oversubscription in reserve. We
+                    # Add worker to pool only once, hold maxoccupancy in reserve. We
                     # want to spread it out over the worker queue:
                     push!(fwp._pool, pid)
-                    if fwp._oversubscription > 1
-                        push!(fwp._spares, (pid, fwp._oversubscription - 1))
+                    if fwp._maxoccupancy > 1
+                        push!(fwp._spares, (pid, fwp._maxoccupancy - 1))
                     end
                 end
                 notify(fwp._worker_mgmt)
@@ -285,18 +285,18 @@ function _add_spare_to_pool!(spares::Channel{Tuple{Int,Int}}, @nospecialize(pool
 
     put!(spares, (invalid_pid, 0))
     while isready(spares)
-        pid, remaining_oversubscription = take!(spares)
+        pid, remaining_occupancy = take!(spares)
         if pid == invalid_pid
             # Ensure loop terminates, we added dummy_id to the end of spares:
             break
         elseif pid < 0
             # Invalid dummy id put into spares by someone else, need to put it back:
-            put!(spares, (pid, remaining_oversubscription))
+            put!(spares, (pid, remaining_occupancy))
         else
-            @assert pid > 0 && remaining_oversubscription > 0
+            @assert pid > 0 && remaining_occupancy > 0
             push!(pool, pid)
-            if remaining_oversubscription > 1
-                put!(spares, (pid, remaining_oversubscription - 1))
+            if remaining_occupancy > 1
+                put!(spares, (pid, remaining_occupancy - 1))
             end
         end
     end

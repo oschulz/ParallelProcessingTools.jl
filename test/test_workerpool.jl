@@ -17,7 +17,7 @@ end
 @testset "workerpool" begin
     @test wp_test_func() == 42
 
-    pool = FlexWorkerPool(oversubscription = 3)
+    pool = FlexWorkerPool(maxoccupancy = 3)
     
     # no workers yet, pool should fall back to using myid():
     @test @inferred(workers(pool)) == [myid()]
@@ -37,7 +37,7 @@ end
     new_workers = setdiff(workers(), prev_workers)
 
     # pool2 has no fallback to myid() and doesn_t init workers:
-    pool2 = FlexWorkerPool(new_workers, oversubscription = 3, init_workers = false)
+    pool2 = FlexWorkerPool(new_workers, maxoccupancy = 3, init_workers = false)
 
     foreach(pid -> push!(pool2, pid), new_workers)
     @test workers(pool2) == new_workers
