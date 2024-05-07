@@ -211,7 +211,7 @@ function write_worker_start_script(
         if ext == ".sh"
             open(filename, "w") do io
                 chmod(filename, 0o700)
-                write(io, Base.shell_escape_posixly(wstartcmd))
+                println(io, Base.shell_escape_posixly(wstartcmd))
             end
         else
             throw(ArgumentError("Script filename extension \"$ext\" not supported on Posix-like OS.")) 
