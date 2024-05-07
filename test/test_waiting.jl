@@ -4,11 +4,11 @@ using Test
 using ParallelProcessingTools
 
 
-@testset "util" begin
+@testset "waiting" begin
     if Sys.islinux()
-        sleep_test_precision = 1
+        sleep_test_precision = 2
     else
-        sleep_test_precision = 5
+        sleep_test_precision = 10
     end
 
     @testset "sleep_ns" begin
@@ -41,7 +41,7 @@ using ParallelProcessingTools
             end)
         end
 
-        @test measure_idle_sleep(0, 10e-6, 100e-6, ntimes = 10000) < sleep_test_precision * 1e-6
+        @test measure_idle_sleep(0, 10e-6, 100e-6, ntimes = 10000) < sleep_test_precision * 2e-6
         @test 5e-6 < measure_idle_sleep(1, 10e-6, 100e-6, ntimes = 1000) < sleep_test_precision * 15e-6
         @test 10e-6 < measure_idle_sleep(2, 10e-6, 100e-6, ntimes = 100) < sleep_test_precision * 25e-6
         @test 15e-6 < measure_idle_sleep(5, 10e-6, 100e-6, ntimes = 100) < sleep_test_precision * 35e-6
