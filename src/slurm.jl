@@ -5,7 +5,7 @@
         slurm_flags::Cmd = {defaults}
         julia_flags::Cmd = {defaults}
         dir = pwd()
-        worker_timeout::Real = 60
+        worker_timeout::Real = ...
         redirect_output::Bool = true
     )
 
@@ -39,7 +39,7 @@ run it from a separate process or so.
     slurm_flags::Cmd = _default_slurm_flags()
     julia_flags::Cmd = _default_julia_flags()
     dir = pwd()
-    worker_timeout::Float64 = 60
+    worker_timeout::Float64 = _default_worker_timeout()
     redirect_output::Bool = true
 end
 export SlurmRun

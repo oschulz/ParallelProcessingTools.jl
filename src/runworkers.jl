@@ -244,6 +244,8 @@ _default_julia_cmd() = `$(_default_addprocs_params[:exename]) $(_default_addproc
 _default_julia_flags() = ``
 _default_julia_project() = Pkg.project().path
 
+_default_worker_timeout() = parse(Int, strip(get(ENV, "JULIA_WORKER_TIMEOUT", "60")))
+
 
 """
     ParallelProcessingTools.worker_local_startcmd(
@@ -251,7 +253,7 @@ _default_julia_project() = Pkg.project().path
         julia_cmd::Cmd = _default_julia_cmd(),
         julia_flags::Cmd = _default_julia_flags(),
         julia_project::AbstractString = _default_julia_project()
-        redirect_output::Bool = true, worker_timeout::Real = 60,
+        redirect_output::Bool = true, worker_timeout::Real = ...,
     )::Cmd
 
 Return the system command required to start a Julia worker process locally
@@ -262,7 +264,7 @@ function worker_local_startcmd(
     julia_cmd::Cmd = _default_julia_cmd(),
     julia_flags::Cmd = _default_julia_flags(),
     julia_project::AbstractString = _default_julia_project(),
-    redirect_output::Bool = true, worker_timeout::Real = 60
+    redirect_output::Bool = true, worker_timeout::Real = _default_worker_timeout()
 )
     julia_code = _elastic_worker_startjl(manager, redirect_output, worker_timeout)
 
@@ -273,7 +275,7 @@ end
 """
     OnLocalhost(;
         n::Integer = 1
-        worker_timeout::Float64 = 60
+        worker_timeout::Float64 = ...
     ) isa DynamicAddProcsMode
 
 Mode that runs `n` worker processes on the current host.
@@ -298,7 +300,7 @@ run it from a separate process or so.
 """
 @with_kw struct OnLocalhost <: DynamicAddProcsMode
     n::Int
-    worker_timeout::Float64 = 60
+    worker_timeout::Float64 = _default_worker_timeout()
 end
 export OnLocalhost
 
