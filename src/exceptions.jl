@@ -84,7 +84,7 @@ macro return_exceptions(expr)
         try
             $(esc(expr))
         catch err
-            return err
+            err
         end
     end
 end
