@@ -337,3 +337,26 @@ end
     lazy_connections::Bool = true
 end
 =#
+
+
+"""
+    stopworkers()
+    stopworkers(pid::Int)
+    stopworkers(pids::AbstractVector{Int})
+
+Stops all or the specified worker processes. The current process is ignored.
+"""
+function stopworkers end
+export stopworkers
+
+stopworkers() = stopworkers(workers())
+
+function stopworkers(pid::Int)
+    pid!=myid() && rmprocs(pid)
+    return nothing
+end
+
+function stopworkers(pids::AbstractVector{Int})
+    rmprocs(filter(!isequal(myid()), pids))
+    return nothing
+end
