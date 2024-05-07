@@ -173,7 +173,13 @@ end
 
 function Distributed.workers(fwp::FlexWorkerPool)
     lock(fwp._worker_mgmt) do
-        _use_main_pool(fwp) ? workers(fwp._pool) : workers(fwp._mypid_pool)
+        sort(_use_main_pool(fwp) ? workers(fwp._pool) : workers(fwp._mypid_pool))
+    end
+end
+
+function Distributed.nworkers(fwp::FlexWorkerPool)
+    lock(fwp._worker_mgmt) do
+        _use_main_pool(fwp) ? nworkers(fwp._pool) : nworkers(fwp._mypid_pool)
     end
 end
 
