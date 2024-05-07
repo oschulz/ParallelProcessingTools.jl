@@ -174,10 +174,10 @@ abstract type DynamicAddProcsMode <: RunProcsMode end
     worker_start_command(
         runmode::DynamicAddProcsMode,
         manager::ClusterManager = ParallelProcessingTools.ppt_cluster_manager()
-    )::Tuple{Cmd,Integer}
+    )::Tuple{Cmd,Integer,Integer}
 
-Return the system command to start worker processes as well as the number of
-workers to start.
+Return a tuple `(cmd, m, n)`, with system command `cmd` that needs to be
+run `m` times (in parallel) to start `n` workers.
 """
 function worker_start_command end
 export worker_start_command
@@ -199,11 +199,13 @@ function write_worker_start_script(
     runmode::DynamicAddProcsMode,
     manager::ClusterManager = ParallelProcessingTools.ppt_cluster_manager()
 )
-    wstartcmd, _ = worker_start_command(runmode, manager)
+    wstartcmd, m, _ = worker_start_command(runmode, manager)
+    @assert m isa Integer && (m >= 0)
     _, ext = split_basename_ext(basename(filename))
     if Sys.iswindows()
         if ext == ".bat" || ext == ".BAT"
-            write(filename, Base.shell_escape_wincmd(wstartcmd))
+            error("Worker start script generation isn't supported on Windows OS yet.")
+            # write(filename, Base.shell_escape_wincmd(wstartcmd))
         else
             throw(ArgumentError("Script filename extension \"$ext\" not supported on Windows.")) 
         end
@@ -211,12 +213,19 @@ function write_worker_start_script(
         if ext == ".sh"
             open(filename, "w") do io
                 chmod(filename, 0o700)
-                println(io, Base.shell_escape_posixly(wstartcmd))
+                println(io, "#!/bin/sh")
+                if m > 0
+                    if m > 1
+                        print(io, "printf \"%s\\n\" {1..$m} | xargs -n1 -P$m -I{} ")
+                    end
+                    println(io, Base.shell_escape_posixly(wstartcmd))
+                end
             end
         else
             throw(ArgumentError("Script filename extension \"$ext\" not supported on Posix-like OS.")) 
         end
     end
+    return nothing
 end
 export write_worker_start_script
 
@@ -301,15 +310,15 @@ function worker_start_command(runmode::OnLocalhost, manager::ClusterManagers.Ela
         julia_flags = julia_flags,
         worker_timeout = runmode.worker_timeout
     )
-    return worker_cmd, runmode.n
+    return worker_cmd, runmode.n, runmode.n
 end
 
 function runworkers(runmode::OnLocalhost, manager::ClusterManagers.ElasticManager)
-    start_cmd, n = worker_start_command(runmode, manager)
+    start_cmd, m, n = worker_start_command(runmode, manager)
 
     task = Threads.@async begin
         processes = Base.Process[]
-        for _ in 1:n
+        for _ in 1:m
             push!(processes, open(start_cmd))
         end
         @wait_while any(isactive, processes)

@@ -73,7 +73,7 @@ function worker_start_command(runmode::SlurmRun, manager::ClusterManagers.Elasti
         redirect_output = runmode.redirect_output, worker_timeout = runmode.worker_timeout
     )
 
-    return `srun --job-name=$jobname --chdir=$dir $slurm_flags $worker_cmd`, n_workers
+    return `srun --job-name=$jobname --chdir=$dir $slurm_flags $worker_cmd`, 1, n_workers
 end
 
 function _slurm_nworkers(tc::NamedTuple)
@@ -99,8 +99,8 @@ function _slurm_mem_per_task(tc::NamedTuple)
 end
 
 
-function ParallelProcessingTools.runworkers(runmode::SlurmRun, manager::ClusterManagers.ElasticManager)
-    srun_cmd, n = worker_start_command(runmode, manager)
+function runworkers(runmode::SlurmRun, manager::ClusterManagers.ElasticManager)
+    srun_cmd, m, n = worker_start_command(runmode, manager)
     @info "Starting SLURM job: $srun_cmd"
     task = Threads.@async begin
         process = open(srun_cmd)
