@@ -7,6 +7,7 @@ using Distributed
 
 old_julia_debug = get(ENV, "JULIA_DEBUG", "")
 ENV["JULIA_DEBUG"] = old_julia_debug * ",ParallelProcessingTools"
+stopworkers()
 
 if !isdefined(@__MODULE__, :wp_test_func)
     @always_everywhere begin
@@ -14,7 +15,7 @@ if !isdefined(@__MODULE__, :wp_test_func)
     end
 end
 
-@testset "workerpool" begin
+@testset "workerpool" begin 
     @test wp_test_func() == 42
 
     pool = FlexWorkerPool(withmyid = true, caching = false, label = "mypool", maxoccupancy = 3)
@@ -96,4 +97,5 @@ end
     @test workers(pool3) == [myid()]
 end
 
+stopworkers()
 ENV["JULIA_DEBUG"] = old_julia_debug

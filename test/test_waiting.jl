@@ -7,8 +7,10 @@ using ParallelProcessingTools
 @testset "waiting" begin
     if Sys.islinux()
         sleep_test_precision = 2
-    else
+    elseif Sys.isapple()
         sleep_test_precision = 10
+    else
+        sleep_test_precision = 3
     end
 
     @testset "sleep_ns" begin

@@ -284,12 +284,9 @@ end
 Run process initialization code on the given process(es) if necessary,
 returns after initialization is complete.
 
-If you want to ensure no initialization code is added while remote process
-initialization is incomplete, you can `lock(allprocs_management_lock())` while
-waiting for the initialization task(s). When using an
-[`FlexWorkerPool`](@ref), worker initialization can safely be run in the
-background though, as the pool will only offer workers (via `take!(pool)`)
-after it has fully initialized them.
+When using a [`FlexWorkerPool`](@ref), worker initialization can safely be run
+in the background though, as the pool will only offer workers
+(via `take!(pool)`) after it has fully initialized them.
 
 See also [`ParallelProcessingTools.get_procinit_code`](@ref)
 and [`ParallelProcessingTools.add_procinit_code`](@ref).

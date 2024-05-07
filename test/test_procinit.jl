@@ -30,7 +30,7 @@ ENV["JULIA_DEBUG"] = old_julia_debug * ",ParallelProcessingTools"
     push!(_g_initial_procinit_code.args, :(_g_inittest1 = 101))
     cinitlvl = current_procinit_level()
     ginitlvl = global_procinit_level()
-    @test @inferred(ensure_procinit([myid()])) isa IdDict{Int,Task}
+    @test @inferred(ensure_procinit([myid()])) isa Nothing
     @test global_procinit_level() == ginitlvl
     @test current_procinit_level() == global_procinit_level()
     @test Main._g_inittest1 == 101
@@ -70,25 +70,13 @@ ENV["JULIA_DEBUG"] = old_julia_debug * ",ParallelProcessingTools"
     add_procinit_code(:(_g_somevar1 = 201))
     @test Main._g_somevar1 == 201
 
-    @test @inferred(ensure_procinit(procs())) isa IdDict{Int,Task}
-
-    r = @always_everywhere begin
+    @always_everywhere begin
         _g_somevar2 = 202
     end
-    @test r isa Task
     @test Main._g_somevar2 == 202
-    wait(r)
 
     addprocs(2)
-
-    init_task = ensure_procinit(workers()[end])
-    @test init_task isa Task
-    wait(init_task)
-    @test ensure_procinit(workers()[end]) isa Nothing
-
-    r = @inferred(ensure_procinit(procs()))
-    @test r isa IdDict{Int,Task}
-    wait_for_all(collect(values(r)))
+    ensure_procinit(workers()[end])
 
     @test remotecall_fetch(last(workers())) do 
         _g_inittest1 + _g_inittest2 + _g_inittest3 + _g_inittest4 + _g_somevar1 + _g_somevar2

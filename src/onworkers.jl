@@ -76,6 +76,8 @@ function onworker(
     all_args = (arg1, args...)
     R = _return_type(f, all_args)
     untyped_result = _on_worker_impl(f, all_args, pool, Float64(maxtime), Int(tries), String(label))
+
+    @assert !(untyped_result isa Exception)
     return convert(R, untyped_result)::R
 end
 
@@ -89,7 +91,7 @@ _return_type(f, args::Tuple) = Core.Compiler.return_type(f, typeof(args))
     n_tries::Int = 0
     while n_tries < tries
         n_tries += 1
-        activity = _Activity(f, label, tries, n_tries)
+        activity = _Activity(f, label, tries)
 
         @debug "Preparing to run $activity, taking a worker from $(getlabel(pool))"
         worker = take!(pool)
@@ -102,43 +104,54 @@ _return_type(f, args::Tuple) = Core.Compiler.return_type(f, typeof(args))
 
             future_result = remotecall(f, worker, args...)
 
-            if maxtime > 0
-                # May throw an exception:
-                wait_for_any(future_result, Timer(maxtime))
-            else
-                # May throw an exception:
-                wait(future_result)
-            end
-            elapsed_time = time() - start_time
+            result_isready = try
+                if maxtime > 0
+                    # May throw an exception:
+                    wait_for_any(future_result, Timer(maxtime))
+                else
+                    # May throw an exception:
+                    wait(future_result)
+                end
+                elapsed_time = time() - start_time
 
-            # May throw an exception:
-            result_isready = isready(future_result)
+                isready(future_result)
+            catch err
+                # Testing if future is ready may throw exceptions from f already:
+                if _should_retry(err)
+                    if !(n_tries < tries)
+                        inner_err = inner_exception(err)
+                        throw(MaxTriesExceeded(tries, n_tries, inner_err))
+                    else
+                        @debug "Will retry $activity ($n_tries tries so far) due to" err
+                    end
+                else
+                    throw(err)
+                end
+                true
+            end
 
             if result_isready
                 # With a `remotecall` to the current process, fetch will return exceptions
                 # originating in the called function, while if run on a remote process they
                 # will be thrown to the caller of fetch. We need to unify this behavior:
 
-                fetched_result = try
-                    fetch(future_result)
-                catch err
-                    err
-                end
+                fetched_result = @return_exceptions fetch(future_result)
 
-                if _should_retry(fetched_result)
-                    if !(n_tries < tries)
-                        err = inner_exception(fetched_result)
-                        throw(MaxTriesExceeded(tries, n_tries, err))
+                if fetched_result isa Exception
+                    err = fetched_result
+                    if _should_retry(err)
+                        if !(n_tries < tries)
+                            inner_err = inner_exception(err)
+                            throw(MaxTriesExceeded(tries, n_tries, inner_err))
+                        else
+                            @debug "Will retry $activity ($n_tries tries so far) due to" err
+                        end
+                    else
+                        throw(err)
                     end
                 else
-                    if fetched_result isa Exception
-                        err = fetched_result
-                        orig_err = inner_exception(fetched_result)
-                        throw(err)
-                    else
-                        @debug "Worker $worker ran $activity successfully in $elapsed_time s"
-                        return fetched_result
-                    end    
+                    @debug "Worker $worker ran $activity successfully in $elapsed_time s"
+                    return fetched_result
                 end
             else
                 # Sanity check: if we got here, we must have timed out:
@@ -205,12 +218,13 @@ end
 @deprecate on_free_worker(f::Function, args...; time::Real = 0, tries::Integer = 1, label::AbstractString) onworker(f, args...; maxtime = time, tries = tries)
 
 
-# For convient debugging output:
+# ToDo: Turn Actitity into a runnable thing, with map and bcast specialiizations:
 struct _Activity
     f::Function
     label::String
     max_tries::Int
-    n_tries::Int
+    # n_tries::Int # ToDo - should n_tries be part of activity objects?
+    # Add max_time::Float64
 end
 
 function Base.show(io::IO, activity::_Activity)
@@ -220,9 +234,9 @@ function Base.show(io::IO, activity::_Activity)
     else
         print(io, "\"$(activity.label)\"")
     end
-    if activity.n_tries > 1 && activity.max_tries > 1
-        print(io, " (try $(activity.n_tries) of $(activity.max_tries))")
-    end
+    #if activity.n_tries > 1 && activity.max_tries > 1
+    #    print(io, " (try $(activity.n_tries) of $(activity.max_tries))")
+    #end
 end
 
 

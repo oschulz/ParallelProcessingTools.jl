@@ -7,6 +7,7 @@ using Distributed
 
 old_julia_debug = get(ENV, "JULIA_DEBUG", "")
 ENV["JULIA_DEBUG"] = old_julia_debug * ",ParallelProcessingTools"
+stopworkers()
 
 if !isdefined(@__MODULE__, :mytask)
     @always_everywhere begin
@@ -44,6 +45,7 @@ end
 @testset "onworkers" begin
 
 @static if VERSION >= v"1.9"
+
     #=
     # For Debugging:
     try; onworker(() -> error("foo"), label = "myactivity") ; catch err; err; end
@@ -59,9 +61,11 @@ end
     @test @inferred(onworker(gen_mayfail(0.5), "foo", 42; tries = 20, label = "mayfail")) == ("foo", 42)
 
     @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(gen_mayfail(1), "bar"; tries = 2, label = "mayfail")
-    @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(mytask, 2, "foo", time = 0.5, tries = 2)
+    @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(mytask, 2, "foo", maxtime = 0.5, tries = 2)
     
-    addworkers(OnLocalhost(2))
+    runworkers(OnLocalhost(n = 2))
+    timer = Timer(30)
+    @wait_while nprocs() < 3 && isopen(timer)
     @test nprocs() == 3
     resources = worker_resources()
     @test length(resources) == 2
@@ -100,4 +104,5 @@ end # Julia >= v1.9
 
 end
 
+stopworkers()
 ENV["JULIA_DEBUG"] = old_julia_debug
