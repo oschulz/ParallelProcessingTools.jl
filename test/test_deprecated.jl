@@ -35,6 +35,7 @@ using Distributed
         end
     end
 
+    pids = addprocs(2)
     @testset "macro mp_async" begin
         @test_deprecated begin
             n = 128
@@ -48,4 +49,5 @@ using Distributed
             fetch.(A) == log.(1:n)
         end
     end
+    rmprocs(pids)
 end
