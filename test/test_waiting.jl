@@ -3,6 +3,8 @@
 using Test
 using ParallelProcessingTools
 
+using ParallelProcessingTools: TimelimitExceeded
+
 
 @testset "waiting" begin
     if Sys.islinux()
@@ -59,6 +61,13 @@ using ParallelProcessingTools
         @wait_while !istaskdone(task) && isopen(timer)
         @test istaskdone(task) == false
         @test time() - t0 < 3
+
+        @test_throws ArgumentError @wait_while maxtime true
+        @test_throws ArgumentError @wait_while someopt=1 true
+        @test_throws TimelimitExceeded @wait_while maxtime=0.25 timeout_error=true true
+        @timed(@wait_while maxtime=-0.5 true).time < 0.1
+        t = Timer(2); 0.3 < @timed(@wait_while maxtime=0.5 isopen(t)).time < 0.7
+        t = Timer(0.5); 0.3 < @timed(@wait_while timeout_error=true isopen(t)).time < 0.7
     end
 
     @testset "wait_for_any" begin
@@ -67,22 +76,36 @@ using ParallelProcessingTools
         @test wait_for_any([nothing, nothing, nothing]) isa Nothing
 
         t0 = time()
-        wait_for_any(Timer(1))
-        @test 0.5 < time() - t0 < 3
+        wait_for_any(Timer(0.5))
+        @test 0.1 < time() - t0 < 0.9
+
+        @test_throws TimelimitExceeded wait_for_any(Timer(0.5), maxtime = 0.1, timeout_error = true)
+        
+        t0 = time()
+        task1 = Threads.@spawn sleep(0.2)
+        task2 = Threads.@spawn sleep(0.6)
+        wait_for_any(task1, task2, maxtime = 0.4, timeout_error = true)
+        @test istaskdone(task1) == true
+        @test istaskdone(task2) == false
+        @test 0.1 < time() - t0 < 0.5
 
         t0 = time()
-        task = Threads.@spawn sleep(5)
-        timer = Timer(0.2)
-        wait_for_any(task, nothing, timer)
-        @test istaskdone(task) == false
-        @test time() - t0 < 3
+        task1 = Threads.@spawn sleep(0.4)
+        task2 = Threads.@spawn sleep(0.6)
+        @test_throws TimelimitExceeded wait_for_any(task1, task2, maxtime = 0.1, timeout_error = true)
 
         t0 = time()
-        task = Threads.@spawn sleep(5)
-        timer = Timer(0.2)
-        wait_for_any([task, nothing, timer])
-        @test istaskdone(task) == false
-        @test time() - t0 < 3
+        task1 = Threads.@spawn sleep(0.2)
+        task2 = Threads.@spawn sleep(0.6)
+        wait_for_any([task1, task2], maxtime = 0.4, timeout_error = true)
+        @test istaskdone(task1) == true
+        @test istaskdone(task2) == false
+        @test 0.1 < time() - t0 < 0.5
+
+        t0 = time()
+        task1 = Threads.@spawn sleep(0.4)
+        task2 = Threads.@spawn sleep(0.6)
+        @test_throws TimelimitExceeded wait_for_any([task1, task2], maxtime = 0.1, timeout_error = true)
     end
 
     @testset "wait_for_all" begin
@@ -95,6 +118,10 @@ using ParallelProcessingTools
         @test 0.5 < time() - t0 < 3
 
         t0 = time()
+        @test_throws TimelimitExceeded wait_for_all(Timer(5); maxtime = 0.4, timeout_error = true)
+        @test 0.2 < time() - t0 < 0.6
+
+        t0 = time()
         task1 = Threads.@spawn sleep(1)
         task2 = Threads.@spawn sleep(0.1)
         wait_for_all(task1, nothing, task2)
@@ -105,5 +132,17 @@ using ParallelProcessingTools
         task2 = Threads.@spawn sleep(0.1)
         wait_for_all([task1, nothing, task2])
         @test 0.8 < time() - t0 < 3
+
+        t0 = time()
+        task1 = Threads.@spawn sleep(1)
+        task2 = Threads.@spawn sleep(0.1)
+        @test_throws TimelimitExceeded wait_for_all(task1, nothing, task2; maxtime = 0.4, timeout_error = true)
+        @test 0.2 < time() - t0 < 0.6
+
+        t0 = time()
+        task1 = Threads.@spawn sleep(1)
+        task2 = Threads.@spawn sleep(0.1)
+        @test_throws TimelimitExceeded wait_for_all([task1, nothing, task2]; maxtime = 0.4, timeout_error = true)
+        @test 0.2 < time() - t0 < 0.6
     end
 end
