@@ -78,36 +78,3 @@ function _printover_screen(io::IO, s::AbstractString, color::Symbol = :color_nor
         print(io, "\u1b[K")     # clear the rest of the line
     end
 end
-
-
-"""
-    keep_showing(obj; stop::Function = ()->false, interval::Real = 1)
-    keep_showing(io::IO, obj; stop::Function = ()->false, interval::Real = 1)
-
-Show `obj` (to `io`) every `interval` seconds while `stop()` returns `false`.
-
-Tries to use screen-printover.
-"""
-function keep_showing end
-export keep_showing
-
-function keep_showing(
-    @nospecialize(obj::Any);
-    @nospecialize(stop::Function = ()->false), @nospecialize(interval::Real = 1)
-)
-    keep_showing(stdout, obj; stop = stop, interval = interval)
-end
-
-function keep_showing(
-    io::IO, @nospecialize(obj::Any);
-    @nospecialize(stop::Function = ()->false), @nospecialize(interval::Real = 1)
-)
-    while !stop()
-        printover(io) do tmpio
-            vscode_nb_mode = in_vscode_notebook()
-            ioctx = IOContext(tmpio, :compact => vscode_nb_mode)
-            show(ioctx,  MIME"text/plain"(), obj)
-        end
-        sleep(interval)
-    end
-end
