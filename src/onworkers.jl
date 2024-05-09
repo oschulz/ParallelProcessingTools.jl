@@ -30,8 +30,6 @@ _should_retry(::TimelimitExceeded) = true
 _should_retry(err::RemoteException) = _should_retry(err.captured.ex)
 
 
-@static if VERSION >= v"1.9"
-
 """
     onworker(
         f::Function, args...;
@@ -51,9 +49,6 @@ terminated.
 If a problem occurs (maxtime or worker failure) while running the activity,
 reschedules the task if the maximum number of tries has not yet been reached,
 otherwise throws an exception.
-
-!!! compat "Compatibility"
-    Requires Julia v1.9
 """
 function onworker end
 export onworker
@@ -241,5 +236,3 @@ end
 
 
 # ToDo: Add function `async_onworker(f, ...)` ?
-
-end # Julia >= v1.9

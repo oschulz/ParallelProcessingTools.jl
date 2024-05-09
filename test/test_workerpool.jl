@@ -4,6 +4,7 @@ using Test
 using ParallelProcessingTools
 
 using Distributed
+import Pkg
 
 old_julia_debug = get(ENV, "JULIA_DEBUG", "")
 ENV["JULIA_DEBUG"] = old_julia_debug * ",ParallelProcessingTools"
@@ -15,7 +16,7 @@ if !isdefined(@__MODULE__, :wp_test_func)
     end
 end
 
-@testset "workerpool" begin 
+@testset "workerpool" begin
     @test wp_test_func() == 42
 
     pool = FlexWorkerPool(withmyid = true, caching = false, label = "mypool", maxoccupancy = 3)
@@ -34,7 +35,7 @@ end
     @test push!(pool, myid()) isa FlexWorkerPool
 
     prev_workers = workers()
-    addprocs(2)
+    classic_addprocs(2)
     new_workers = setdiff(workers(), prev_workers)
 
     # pool2 has no fallback to myid() and doesn_t init workers:
