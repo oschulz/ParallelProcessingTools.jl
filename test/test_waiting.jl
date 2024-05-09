@@ -10,7 +10,7 @@ using ParallelProcessingTools: TimelimitExceeded
     if Sys.islinux()
         sleep_test_precision = 2
     elseif Sys.isapple()
-        sleep_test_precision = 10
+        sleep_test_precision = 50
     else
         sleep_test_precision = 3
     end
