@@ -105,7 +105,7 @@ const _current_procinit_level = Ref(0)
 Return the global process init level.
 
 Returns, e.g., the number of times [`add_procinit_code`](@ref) resp.
-[`@almost_everywhere`](@ref) have been called.
+[`@always_everywhere`](@ref) have been called.
 
 See also [`current_procinit_level`](@ref).
 """
