@@ -4,6 +4,9 @@ using Test
 using ParallelProcessingTools
 
 using Distributed
+using ParallelProcessingTools: isactive
+
+include("testtools.jl")
 
 old_julia_debug = get(ENV, "JULIA_DEBUG", "")
 ENV["JULIA_DEBUG"] = old_julia_debug * ",ParallelProcessingTools"
@@ -43,6 +46,25 @@ end
 
 
 @testset "onworkers" begin
+    runmode = OnLocalhost(n = 2)
+
+    @testset "runworkers $(nameof(typeof(runmode)))" begin
+        test_runprocs(2) do
+            runworkers(runmode)[1]
+        end
+    end
+
+    if Sys.isunix()
+        @testset "write_worker_start_script $(nameof(typeof(runmode)))" begin
+            mktempdir(prefix = "ppt-startscript-test") do dir
+                test_runprocs(2) do
+                    startscript = write_worker_start_script(joinpath(dir, "startjlworkers.sh"), runmode)
+                    open(`$startscript`)
+                end
+            end
+        end
+    end
+
 
 @static if VERSION >= v"1.9"
 
