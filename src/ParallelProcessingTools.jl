@@ -12,7 +12,6 @@ import Pkg
 import Sockets
 
 import ClusterManagers
-import ThreadPinning
 
 using Base: Process
 using Logging: @logmsg, LogLevel, Info, Debug
@@ -42,5 +41,9 @@ include("onworkers.jl")
 include("runworkers.jl")
 include("slurm.jl")
 include("deprecated.jl")
+
+@static if !isdefined(Base, :get_extension)
+    include("../ext/ParallelProcessingToolsThreadPinningExt.jl")
+end
 
 end # module

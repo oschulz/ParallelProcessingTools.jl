@@ -1,29 +1,24 @@
 # This file is a part of ParallelProcessingTools.jl, licensed under the MIT License (MIT).
 
 
+
 """
     pinthreads_auto()
 
-Use default thread-pinning strategy for the current Julia process.
+!!! note
+    Only has an effect if
+    [`ThreadPinning`](https://github.com/carstenbauer/ThreadPinning.jl/) is
+    loaded, and only on operating systems supported by `ThreadPinning`.
 """
-function pinthreads_auto()
-    if Distributed.myid() == 1
-        let n_juliathreads = nthreads()
-            if n_juliathreads > 1
-                LinearAlgebra.BLAS.set_num_threads(n_juliathreads)
-            end
-        end
-    else
-        @static if isdefined(ThreadPinning, :affinitymask2cpuids)
-            # Not available on all platforms:
-            let available_cpus = ThreadPinning.affinitymask2cpuids(ThreadPinning.get_affinity_mask())
-                ThreadPinning.pinthreads(:affinitymask)
-                LinearAlgebra.BLAS.set_num_threads(length(available_cpus))
-            end
-        end
-    end
-end
+function pinthreads_auto end
 export pinthreads_auto
+
+pinthreads_auto() = _pinthreads_auto_impl(Val(true))
+_pinthreads_auto_impl(::Val) = nothing
+
+
+_getcpuids() = _getcpuids_impl(Val(true))
+_getcpuids_impl(::Val) = nothing
 
 
 """
@@ -52,12 +47,6 @@ function _current_process_resources()
     )
 end
 
-@static if isdefined(ThreadPinning, :getcpuids)
-    # Not available on all platforms:
-    _getcpuids() = ThreadPinning.getcpuids()
-else
-    _getcpuids() = missing
-end
 
 
 """

@@ -13,6 +13,12 @@ Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 Sockets = "6462fe0b-24de-5631-8697-dd941f90decc"
 ThreadPinning = "811555cd-349b-4f26-b7bc-1f208b848042"
 
+[weakdeps]
+ThreadPinning = "811555cd-349b-4f26-b7bc-1f208b848042"
+
+[extensions]
+ParallelProcessingToolsThreadPinningExt = "ThreadPinning"
+
 [compat]
 ArgCheck = "1, 2"
 ClusterManagers = "0.4.6"
