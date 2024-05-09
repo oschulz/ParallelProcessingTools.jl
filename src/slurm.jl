@@ -5,7 +5,7 @@
         slurm_flags::Cmd = {defaults}
         julia_flags::Cmd = {defaults}
         dir = pwd()
-        worker_timeout::Real = ...
+        env::Dict{String,String} = Dict{String,String}()
         redirect_output::Bool = true
     )
 
@@ -39,7 +39,7 @@ run it from a separate process or so.
     slurm_flags::Cmd = _default_slurm_flags()
     julia_flags::Cmd = _default_julia_flags()
     dir = pwd()
-    worker_timeout::Float64 = _default_worker_timeout()
+    env::Dict{String,String} = Dict{String,String}()
     redirect_output::Bool = true
 end
 export SlurmRun
@@ -70,7 +70,7 @@ function worker_start_command(runmode::SlurmRun, manager::ClusterManagers.Elasti
     worker_cmd = worker_local_startcmd(
         manager;
         julia_flags = `$julia_flags $additional_julia_flags`,
-        redirect_output = runmode.redirect_output, worker_timeout = runmode.worker_timeout
+        redirect_output = runmode.redirect_output, env = runmode.env
     )
 
     return `srun --job-name=$jobname --chdir=$dir $slurm_flags $worker_cmd`, 1, n_workers

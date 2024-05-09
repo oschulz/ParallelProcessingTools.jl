@@ -230,12 +230,21 @@ end
 export write_worker_start_script
 
 
-function _elastic_worker_startjl(manager::ClusterManagers.ElasticManager, redirect_output::Bool, worker_timeout::Real)
+function _elastic_worker_startjl(
+    @nospecialize(manager::ClusterManagers.ElasticManager),
+    redirect_output::Bool,
+    @nospecialize(env::AbstractDict{<:AbstractString,<:AbstractString})
+)
+    env_withdefaults = Dict{String,String}()
+    haskey(ENV, "JULIA_WORKER_TIMEOUT") && (env_withdefaults["JULIA_WORKER_TIMEOUT"] = ENV["JULIA_WORKER_TIMEOUT"])
+    merge!(env_withdefaults, env)
+    env_vec = isempty(env_withdefaults) ? [] : collect(env_withdefaults)
+
     cookie = Distributed.cluster_cookie()
     socket_name = manager.sockname
     address = string(socket_name[1])
     port = convert(Int, socket_name[2])
-    """import ClusterManagers; ClusterManagers.elastic_worker("$cookie", "$address", $port, stdout_to_master=$redirect_output, worker_timeout=$worker_timeout)"""
+    """import ClusterManagers; ClusterManagers.elastic_worker("$cookie", "$address", $port, stdout_to_master=$redirect_output, env=$env_vec)"""
 end
 
 const _default_addprocs_params = Distributed.default_addprocs_params()
@@ -244,8 +253,6 @@ _default_julia_cmd() = `$(_default_addprocs_params[:exename]) $(_default_addproc
 _default_julia_flags() = ``
 _default_julia_project() = Pkg.project().path
 
-_default_worker_timeout() = parse(Int, strip(get(ENV, "JULIA_WORKER_TIMEOUT", "60")))
-
 
 """
     ParallelProcessingTools.worker_local_startcmd(
@@ -253,20 +260,22 @@ _default_worker_timeout() = parse(Int, strip(get(ENV, "JULIA_WORKER_TIMEOUT", "6
         julia_cmd::Cmd = _default_julia_cmd(),
         julia_flags::Cmd = _default_julia_flags(),
         julia_project::AbstractString = _default_julia_project()
-        redirect_output::Bool = true, worker_timeout::Real = ...,
+        redirect_output::Bool = true,
+        env::AbstractDict{<:AbstractString,<:AbstractString} = ...,
     )::Cmd
 
 Return the system command required to start a Julia worker process locally
 on some host, so that it will connect to `manager`.
 """
 function worker_local_startcmd(
-    manager::Distributed.ClusterManager;
+    @nospecialize(manager::Distributed.ClusterManager);
     julia_cmd::Cmd = _default_julia_cmd(),
     julia_flags::Cmd = _default_julia_flags(),
-    julia_project::AbstractString = _default_julia_project(),
-    redirect_output::Bool = true, worker_timeout::Real = _default_worker_timeout()
+    @nospecialize(julia_project::AbstractString = _default_julia_project()),
+    redirect_output::Bool = true,
+    @nospecialize(env::AbstractDict{<:AbstractString,<:AbstractString} = Dict{String,String}())
 )
-    julia_code = _elastic_worker_startjl(manager, redirect_output, worker_timeout)
+    julia_code = _elastic_worker_startjl(manager, redirect_output, env)
 
     `$julia_cmd --project=$julia_project $julia_flags -e $julia_code`
 end
@@ -275,7 +284,7 @@ end
 """
     OnLocalhost(;
         n::Integer = 1
-        worker_timeout::Float64 = ...
+        env::Dict{String,String} = Dict{String,String}()
     ) isa DynamicAddProcsMode
 
 Mode that runs `n` worker processes on the current host.
@@ -300,7 +309,7 @@ run it from a separate process or so.
 """
 @with_kw struct OnLocalhost <: DynamicAddProcsMode
     n::Int
-    worker_timeout::Float64 = _default_worker_timeout()
+    env::Dict{String,String} = Dict{String,String}()
 end
 export OnLocalhost
 
@@ -310,7 +319,7 @@ function worker_start_command(runmode::OnLocalhost, manager::ClusterManagers.Ela
     worker_cmd = worker_local_startcmd(
         manager;
         julia_flags = julia_flags,
-        worker_timeout = runmode.worker_timeout
+        env = runmode.env
     )
     return worker_cmd, runmode.n, runmode.n
 end
