@@ -107,7 +107,7 @@ _return_type(f, args::Tuple) = Core.Compiler.return_type(f, typeof(args))
             result_isready = try
                 if maxtime > 0
                     # May throw an exception:
-                    wait_for_any(future_result, Timer(maxtime))
+                    wait_for_any(future_result, maxtime = maxtime)
                 else
                     # May throw an exception:
                     wait(future_result)
