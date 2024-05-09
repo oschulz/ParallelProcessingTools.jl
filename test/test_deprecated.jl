@@ -5,6 +5,8 @@ using ParallelProcessingTools
 
 using Distributed
 
+include("testtools.jl")
+
 
 @testset "deprecated" begin
     function do_work(n)
@@ -35,7 +37,7 @@ using Distributed
         end
     end
 
-    pids = addprocs(2)
+    pids = classic_addprocs(2)
     @testset "macro mp_async" begin
         @test_deprecated begin
             n = 128

@@ -5,11 +5,13 @@ using ParallelProcessingTools
 
 using Distributed
 
+include("testtools.jl")
+
 
 @testset "onprocs" begin
     @testset "worker-init" begin
         if length(workers()) < 2
-            addprocs(2)
+            classic_addprocs(2)
         end
         eval(:(@everywhere using Distributed))
         @test length(workers()) >= 2

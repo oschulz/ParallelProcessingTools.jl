@@ -65,9 +65,6 @@ end
         end
     end
 
-
-@static if VERSION >= v"1.9"
-
     #=
     # For Debugging:
     try; onworker(() -> error("foo"), label = "myactivity") ; catch err; err; end
@@ -86,6 +83,7 @@ end
     @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(mytask, 2, "foo", maxtime = 0.5, tries = 2)
     
     runworkers(OnLocalhost(n = 2))
+
     timer = Timer(30)
     @wait_while nprocs() < 3 && isopen(timer)
     @test nprocs() == 3
@@ -121,9 +119,6 @@ end
     @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(gen_mayfail(1), "bar"; tries = 2, label = "mayfail")
     @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(mytask, 2, "foo", time = 0.5, tries = 2)
     =#
-
-end # Julia >= v1.9
-
 end
 
 stopworkers()

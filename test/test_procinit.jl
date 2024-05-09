@@ -13,6 +13,7 @@ using ParallelProcessingTools: _global_procinit_level, _current_procinit_level,
     _g_initial_procinit_code, _g_procinit_code, _g_wrapped_procinit_code,
     _store_additional_procinit_code, _execute_procinit_code
 
+include("testtools.jl")
 
 old_julia_debug = get(ENV, "JULIA_DEBUG", "")
 ENV["JULIA_DEBUG"] = old_julia_debug * ",ParallelProcessingTools"
@@ -75,7 +76,7 @@ ENV["JULIA_DEBUG"] = old_julia_debug * ",ParallelProcessingTools"
     end
     @test Main._g_somevar2 == 202
 
-    addprocs(2)
+    classic_addprocs(2)
     ensure_procinit(workers()[end])
 
     @test remotecall_fetch(last(workers())) do 
