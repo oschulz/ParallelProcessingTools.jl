@@ -119,7 +119,7 @@ const _g_cluster_manager = Ref{Union{Nothing,ClusterManager}}(nothing)
 
 function ppt_cluster_manager()
     if isnothing(_g_cluster_manager[])
-        _g_cluster_manager[] = ClusterManagers.ElasticManager(
+        _g_cluster_manager[] = ElasticManager(
             addr=:auto, port=0, topology=:master_worker, manage_callback = _get_elasticmgr_add_to_pool_callback()
         )
     end
@@ -127,18 +127,18 @@ function ppt_cluster_manager()
 end
 
 """
-    ParallelProcessingTools.ppt_cluster_manager!(manager::ClusterManagers.ElasticManager)
+    ParallelProcessingTools.ppt_cluster_manager!(manager::CustomClusterManagers.ElasticManager)
 
 Set the default ParallelProcessingTools cluster manager.
 """
-function ppt_cluster_manager!(manager::ClusterManagers.ElasticManager)
+function ppt_cluster_manager!(manager::ElasticManager)
     _g_cluster_manager[] = manager
     return _g_cluster_manager[]
 end
 export ppt_cluster_manager!
 
 function _get_elasticmgr_add_to_pool_callback(get_workerpool::Function = ppt_worker_pool)
-    function mgr_add_too_pool(::ClusterManagers.ElasticManager, pid::Integer, op::Symbol)
+    function mgr_add_too_pool(::ElasticManager, pid::Integer, op::Symbol)
         pool = get_workerpool()::AbstractWorkerPool
         if op == :register
             Threads.@async begin
@@ -231,7 +231,7 @@ export write_worker_start_script
 
 
 function _elastic_worker_startjl(
-    @nospecialize(manager::ClusterManagers.ElasticManager),
+    @nospecialize(manager::ElasticManager),
     redirect_output::Bool,
     @nospecialize(env::AbstractDict{<:AbstractString,<:AbstractString})
 )
@@ -244,7 +244,7 @@ function _elastic_worker_startjl(
     socket_name = manager.sockname
     address = string(socket_name[1])
     port = convert(Int, socket_name[2])
-    """import ClusterManagers; ClusterManagers.elastic_worker("$cookie", "$address", $port, stdout_to_master=$redirect_output, env=$env_vec)"""
+    """import ParallelProcessingTools; ParallelProcessingTools.CustomClusterManagers.elastic_worker("$cookie", "$address", $port, stdout_to_master=$redirect_output, env=$env_vec)"""
 end
 
 const _default_addprocs_params = Distributed.default_addprocs_params()
@@ -313,7 +313,7 @@ run it from a separate process or so.
 end
 export OnLocalhost
 
-function worker_start_command(runmode::OnLocalhost, manager::ClusterManagers.ElasticManager)
+function worker_start_command(runmode::OnLocalhost, manager::ElasticManager)
     worker_nthreads = nthreads()
     julia_flags = `$(_default_julia_flags()) --threads=$worker_nthreads`
     worker_cmd = worker_local_startcmd(
@@ -324,7 +324,7 @@ function worker_start_command(runmode::OnLocalhost, manager::ClusterManagers.Ela
     return worker_cmd, runmode.n, runmode.n
 end
 
-function runworkers(runmode::OnLocalhost, manager::ClusterManagers.ElasticManager)
+function runworkers(runmode::OnLocalhost, manager::ElasticManager)
     start_cmd, m, n = worker_start_command(runmode, manager)
 
     task = Threads.@async begin

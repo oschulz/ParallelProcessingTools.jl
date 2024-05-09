@@ -5,7 +5,7 @@ This Julia package provides some tools to ease multithreaded and distributed pro
 
 ## Compute cluster management
 
-ParallelProcessingTools helps spin-up Julia compute clusters. It currently has support for clusters on localhost and on SLURM (uses `ClusterManagers.ElasticManager` internally).
+ParallelProcessingTools helps spin-up Julia compute clusters. It currently has support for clusters on localhost and on SLURM (uses `ParallelProcessingTools.CustomClusterManagers.ElasticManager` internally).
 
 
 ```julia

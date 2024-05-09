@@ -47,7 +47,7 @@ export SlurmRun
 
 const _g_slurm_nextjlstep = Base.Threads.Atomic{Int}(1)
 
-function worker_start_command(runmode::SlurmRun, manager::ClusterManagers.ElasticManager)
+function worker_start_command(runmode::SlurmRun, manager::ElasticManager)
     slurm_flags = runmode.slurm_flags
     julia_flags = runmode.julia_flags
     dir = runmode.dir
@@ -99,7 +99,7 @@ function _slurm_mem_per_task(tc::NamedTuple)
 end
 
 
-function runworkers(runmode::SlurmRun, manager::ClusterManagers.ElasticManager)
+function runworkers(runmode::SlurmRun, manager::ElasticManager)
     srun_cmd, m, n = worker_start_command(runmode, manager)
     @info "Starting SLURM job: $srun_cmd"
     task = Threads.@async begin
