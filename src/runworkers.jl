@@ -24,9 +24,13 @@ _getcpuids_impl(::Val) = nothing
 """
     worker_resources
 
-Get the distributed Julia process resources currently available.
+Get the distributed Julia worker process resources currently available.
+
+This may take some time as some code needs to be loaded on all processes.
+Automatically runs `ensure_procinit()` before querying worker resources.
 """
 function worker_resources()
+    ensure_procinit()
     pids = Distributed.workers()
     load_ft = Distributed.remotecall.(Core.eval, pids, Ref(Main), Ref(:(import ParallelProcessingTools)))
     fetch.(load_ft)
