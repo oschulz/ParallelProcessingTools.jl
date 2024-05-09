@@ -210,8 +210,6 @@ _return_type(f, args::Tuple) = Core.Compiler.return_type(f, typeof(args))
     @assert false
 end
 
-@deprecate on_free_worker(f::Function, args...; time::Real = 0, tries::Integer = 1, label::AbstractString) onworker(f, args...; maxtime = time, tries = tries)
-
 
 # ToDo: Turn Actitity into a runnable thing, with map and bcast specialiizations:
 struct _Activity
