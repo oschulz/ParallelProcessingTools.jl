@@ -221,6 +221,7 @@ function write_worker_start_script(
                     println(io, Base.shell_escape_posixly(wstartcmd))
                 end
             end
+            return filename
         else
             throw(ArgumentError("Script filename extension \"$ext\" not supported on Posix-like OS.")) 
         end
