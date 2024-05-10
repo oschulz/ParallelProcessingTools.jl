@@ -8,13 +8,14 @@ given exit code (not equal zero).
 """
 struct NonZeroExitCode <: Exception
     exitcode::Int
+
+    function NonZeroExitCode(exitcode::Int)
+        exitcode == 0 && throw(ArgumentError("NonZeroExitCode exitcode must not be zero"))
+        new(exitcode)
+    end
 end
 
-function NonZeroExitCode(exitcode::Integer)
-    exitcode == 0 && throw(ArgumentError("NonZeroExitCode exitcode must not be zero"))
-    NonZeroExitCode(exitcode)
-end
-
+NonZeroExitCode(exitcode::Integer) = NonZeroExitCode(Int(exitcode))
 
 
 """
