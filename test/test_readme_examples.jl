@@ -5,14 +5,16 @@ using Test
 
 using Distributed
 
+include("testtools.jl")
+
 if length(workers()) < 2
-    addprocs(2)
+    classic_addprocs(2)
 end
 
 @testset "workpartition" begin
     @testset "parallel histogramming" begin
         using Distributed, ParallelProcessingTools
-        addprocs(2)
+        classic_addprocs(2)
         @everywhere using ParallelProcessingTools, Base.Threads,
             DistributedArrays, Statistics, StatsBase
 

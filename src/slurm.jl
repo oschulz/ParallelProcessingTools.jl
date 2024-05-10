@@ -5,8 +5,8 @@
         slurm_flags::Cmd = {defaults}
         julia_flags::Cmd = {defaults}
         dir = pwd()
-        user_start::Bool = false
-        timeout::Real = 60
+        env::Dict{String,String} = Dict{String,String}()
+        redirect_output::Bool = true
     )
 
 Mode to add worker processes via SLURM `srun`.
@@ -20,31 +20,37 @@ Workers are started with current directory set to `dir`.
 Example:
 
 ```julia
-mode = SlurmRun(slurm_flags = `--ntasks=4 --cpus-per-task=8 --mem-per-cpu=8G`)
-addworkers(mode)
+runmode = SlurmRun(slurm_flags = `--ntasks=4 --cpus-per-task=8 --mem-per-cpu=8G`)
+task = runworkers(runmode)
+
+Threads.@async begin
+    wait(task)
+    @info "SLURM workers have terminated."
+end
+
+@wait_while nprocs()-1 < n
 ```
 
-If `user_start` is `true`, then the SLURM srun-command will not be run
-automatically, instead it will be logged via `@info` and the user is
-responsible for running it. This srun-command can also be retrieved via
-[`worker_start_command(mode)`](@ref).
+Workers can also be started manually, use
+[`worker_start_command(runmode)`](@ref) to get the `srun` start command and
+run it from a separate process or so.
 """
-@with_kw struct SlurmRun <: ElasticAddProcsMode
+@with_kw struct SlurmRun <: DynamicAddProcsMode
     slurm_flags::Cmd = _default_slurm_flags()
     julia_flags::Cmd = _default_julia_flags()
     dir = pwd()
-    user_start::Bool = false
-    timeout::Real = 60
+    env::Dict{String,String} = Dict{String,String}()
+    redirect_output::Bool = true
 end
 export SlurmRun
 
 
 const _g_slurm_nextjlstep = Base.Threads.Atomic{Int}(1)
 
-function worker_start_command(mode::SlurmRun, manager::ClusterManagers.ElasticManager)
-    slurm_flags = mode.slurm_flags
-    julia_flags = mode.julia_flags
-    dir = mode.dir
+function worker_start_command(runmode::SlurmRun, manager::ElasticManager)
+    slurm_flags = runmode.slurm_flags
+    julia_flags = runmode.julia_flags
+    dir = runmode.dir
 
     tc = _get_slurm_taskconf(slurm_flags, ENV)
 
@@ -61,9 +67,13 @@ function worker_start_command(mode::SlurmRun, manager::ClusterManagers.ElasticMa
     jlstep = atomic_add!(_g_slurm_nextjlstep, 1)
     jobname = "julia-$(getpid())-$jlstep"
 
-    worker_cmd = elastic_localworker_startcmd(manager; julia_flags = `$julia_flags $additional_julia_flags`)
+    worker_cmd = worker_local_startcmd(
+        manager;
+        julia_flags = `$julia_flags $additional_julia_flags`,
+        redirect_output = runmode.redirect_output, env = runmode.env
+    )
 
-    return `srun --job-name=$jobname --chdir=$dir $slurm_flags $worker_cmd`, n_workers
+    return `srun --job-name=$jobname --chdir=$dir $slurm_flags $worker_cmd`, 1, n_workers
 end
 
 function _slurm_nworkers(tc::NamedTuple)
@@ -89,25 +99,16 @@ function _slurm_mem_per_task(tc::NamedTuple)
 end
 
 
-function ParallelProcessingTools.start_elastic_workers(mode::SlurmRun, manager::ClusterManagers.ElasticManager)
-    srun_cmd, n_workers = worker_start_command(mode, manager)
-    if mode.user_start
-        @info "To add Julia worker processes (I'll wait for them), run: $srun_cmd"
-    else
-        @info "Starting SLURM job: $srun_cmd"
-        srun_proc = open(srun_cmd)
+function runworkers(runmode::SlurmRun, manager::ElasticManager)
+    srun_cmd, m, n = worker_start_command(runmode, manager)
+    @info "Starting SLURM job: $srun_cmd"
+    task = Threads.@async begin
+        process = open(srun_cmd)
+        wait(process)
+        @info "SLURM job terminated: $srun_cmd"
     end
-    return n_workers
+    return task, n
 end
-
-function worker_init_code(::SlurmRun)
-    quote
-        import ParallelProcessingTools
-        ParallelProcessingTools.pinthreads_auto()
-    end
-end
-
-elastic_addprocs_timeout(mode::SlurmRun) = mode.timeout
 
 
 function _default_slurm_flags()
@@ -120,7 +121,7 @@ end
 
 const _slurm_memunits = IdDict{Char,Int}('K' => 1024^1, 'M' => 1024^2, 'G' => 1024^3, 'T' => 1024^4)
 
-const _slurm_memsize_regex = r"^([0-9]+)([KMGT])?$"
+const _slurm_memsize_regex = r"^([0-9]+)(([KMGT])B?)?$"
 function _slurm_parse_memoptval(memsize::AbstractString)
     s = strip(memsize)
     m = match(_slurm_memsize_regex, s)
@@ -128,7 +129,7 @@ function _slurm_parse_memoptval(memsize::AbstractString)
         throw(ArgumentError("Invalid SLURM memory size specification \"$s\""))
     else
         value = parse(Int, m.captures[1])
-        unitchar = only(something(m.captures[2], 'M'))
+        unitchar = only(something(m.captures[3], 'M'))
         unitmult = _slurm_memunits[unitchar]
         return value * unitmult
     end
@@ -192,7 +193,7 @@ function _get_slurm_taskconf(slurmflags::Cmd, env::AbstractDict{String,String})
     ntasks_per_node = get(env, "SLURM_NTASKS_PER_NODE", nothing)
     mem_per_node = get(env, "SLURM_MEM_PER_NODE", nothing)
 
-    args = slurmflags.exec
+    args = collect(slurmflags)
     i::Int = firstindex(args)
     while i <= lastindex(args)
         last_i = i
@@ -219,50 +220,4 @@ function _get_slurm_taskconf(slurmflags::Cmd, env::AbstractDict{String,String})
         ntasks_per_node = _slurm_parse_intoptval(ntasks_per_node),
         mem_per_node = _slurm_parse_memoptval(mem_per_node),
     )
-end
-
-
-function _addprocs_slurm(; kwargs...)
-    slurm_ntasks = parse(Int, ENV["SLURM_NTASKS"])
-    slurm_ntasks > 1 || throw(ErrorException("Invalid nprocs=$slurm_ntasks inferred from SLURM environment"))
-    _addprocs_slurm(slurm_ntasks; kwargs...)
-end
-
-function _addprocs_slurm(
-    nprocs::Int;
-    job_file_loc::AbstractString = joinpath(homedir(), "slurm-julia-output"),
-    retry_delays::AbstractVector{<:Real} = [1, 1, 2, 2, 4, 5, 5, 10, 10, 10, 10, 20, 20, 20]
-)
-    try
-        lock(_g_processops_lock)
-
-        @info "Adding $nprocs Julia processes via SLURM"
-
-        julia_project = dirname(Pkg.project().path)
-        slurm_ntasks = nprocs
-        slurm_nthreads = parse(Int, ENV["SLURM_CPUS_PER_TASK"])
-        slurm_mem_per_cpu = parse(Int, ENV["SLURM_MEM_PER_CPU"]) * 1024^2
-        slurm_mem_per_task = slurm_nthreads * slurm_mem_per_cpu
-
-        cluster_manager = ClusterManagers.SlurmManager(slurm_ntasks, retry_delays)
-        worker_timeout = round(Int, max(sum(cluster_manager.retry_delays), 60))
-        ENV["JULIA_WORKER_TIMEOUT"] = "$worker_timeout"
-        
-        mkpath(job_file_loc)
-        new_workers = Distributed.addprocs(
-            cluster_manager, job_file_loc = job_file_loc,
-            exeflags = `--project=$julia_project --threads=$slurm_nthreads --heap-size-hint=$(slurm_mem_per_task÷2)`,
-            cpus_per_task = "$slurm_nthreads", mem_per_cpu="$(slurm_mem_per_cpu >> 30)G", # time="0:10:00",
-            mem_bind = "local", cpu_bind="cores",
-        )
-
-        @info "Configuring $nprocs new Julia worker processes"
-
-        _run_always_everywhere_code(new_workers)
-        pinthreads_distributed(new_workers)
-
-        @info "Added $(length(new_workers)) Julia worker processes via SLURM"
-    finally
-        unlock(_g_processops_lock)
-    end
 end

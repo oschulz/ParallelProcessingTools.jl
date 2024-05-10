@@ -5,6 +5,8 @@ using ParallelProcessingTools
 
 using Distributed
 
+include("testtools.jl")
+
 
 @testset "deprecated" begin
     function do_work(n)
@@ -35,6 +37,7 @@ using Distributed
         end
     end
 
+    pids = classic_addprocs(2)
     @testset "macro mp_async" begin
         @test_deprecated begin
             n = 128
@@ -48,4 +51,5 @@ using Distributed
             fetch.(A) == log.(1:n)
         end
     end
+    rmprocs(pids)
 end
