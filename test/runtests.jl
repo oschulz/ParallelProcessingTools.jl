@@ -9,6 +9,7 @@ Test.@testset "Package ParallelProcessingTools" begin
     @info "Testing with $(Base.Threads.nthreads()) Julia threads."
 
     include("test_aqua.jl")
+    include("test_memory.jl")
     include("test_waiting.jl")
     include("test_states.jl")
     include("test_fileio.jl")

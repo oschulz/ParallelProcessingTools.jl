@@ -25,6 +25,7 @@ using Parameters: @with_kw
 include("custom_cluster_managers.jl")
 using .CustomClusterManagers: ElasticManager
 
+include("memory.jl")
 include("display.jl")
 include("waiting.jl")
 include("exceptions.jl")

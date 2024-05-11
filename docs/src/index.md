@@ -14,7 +14,9 @@ The elastic cluster manager automatically adds new workers to an automatically c
 Since workers can appear and disappear dynamically, initializing them (loading packages, etc.) via the standard `Distributed.@everywhere` macro is problematic, as workers added afterwards won't be initialized. Parallel processing tools provides the macro [`@always_everywhere`](@ref) to run code globally on all current processes, but also store the code so it can be run again on future new worker processes. Workers that are part of a [`FlexWorkerPool`](@ref) will be updated automatically on `take!` and `onworker`. You can also use [`ensure_procinit`](@ref) to manually update all workers
 to all `@always_everywhere` used so far.
 
-The function [`pinthreads_auto`](@ref)  (used inside of `@always_everywhere`) provides a convenient way to perform some automatic thread pinning on all processes. Note that it needs to follow an [`import ThreadPinning`](https://github.com/carstenbauer/ThreadPinning.jl/), and that more complex use cased may require customized thread pinning for best performance.
+The function [`pinthreads_auto`](@ref)  (used inside of `@always_everywhere`) provides a convenient way to perform some automatic thread pinning on all processes. Note that it needs to follow an [`import ThreadPinning`](https://github.com/carstenbauer/ThreadPinning.jl/), and that more complex use cases may require customized thread pinning for best performance.
+
+Some batch system configurations can result in whole Julia processes, or even a whole batch job, being terminated if a process exceeds its memory limit. In such cases, you can try to gain a softer failure mode by setting a custom (slightly smaller) memory limit using [`memory_limit!`](@ref).
 
 For example:
 
@@ -30,6 +32,9 @@ using ParallelProcessingTools, Distributed
 
     import ThreadPinning
     pinthreads_auto()
+
+    # Optional: Set a custom memory limit for worker processes:
+    # myid() != 1 && memory_limit!(8 * 1000^3) # 8 GB
 end
 
 runmode = OnLocalhost(n = 4)
