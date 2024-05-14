@@ -12,7 +12,8 @@ export inner_exception
 inner_exception(err) = err
 inner_exception(err::CompositeException) = CompositeException(inner_exception.(err.exceptions))
 inner_exception(err::TaskFailedException) = err.task.result
-inner_exception(err::RemoteException) = err.captured.ex
+inner_exception(err::RemoteException) = inner_exception(err.captured)
+inner_exception(err::Base.CapturedException) = err.ex
 
 
 """
@@ -29,6 +30,7 @@ original_exception(err) = err
 original_exception(err::CompositeException) = CompositeException(original_exception.(err.exceptions))
 original_exception(err::TaskFailedException) = original_exception(err.task.result)
 original_exception(err::RemoteException) = original_exception(err.captured.ex)
+original_exception(err::Base.CapturedException) = original_exception(err.ex)
 
 
 """
