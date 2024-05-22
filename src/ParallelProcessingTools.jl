@@ -25,6 +25,7 @@ using Parameters: @with_kw
 include("custom_cluster_managers.jl")
 using .CustomClusterManagers: ElasticManager
 
+include("scopedvalues.jl")
 include("memory.jl")
 include("display.jl")
 include("waiting.jl")
@@ -36,6 +37,7 @@ include("threadlocal.jl")
 include("onthreads.jl")
 include("onprocs.jl")
 include("workpartition.jl")
+include("activity.jl")
 include("procinit.jl")
 include("workerpool.jl")
 include("onworkers.jl")
