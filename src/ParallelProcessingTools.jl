@@ -41,6 +41,7 @@ include("workerpool.jl")
 include("onworkers.jl")
 include("runworkers.jl")
 include("slurm.jl")
+include("htcondor.jl")
 include("deprecated.jl")
 
 @static if !isdefined(Base, :get_extension)
