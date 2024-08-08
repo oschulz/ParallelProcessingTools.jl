@@ -88,7 +88,7 @@ predicted (accurately).
 Example:
 
 ```julia
-task, n = runworkers(OnLocalhost(nprocs = 4))
+task, n = runworkers(OnLocalhost(n = 4))
 ```
 
 See also [`worker_resources()`](@ref).
