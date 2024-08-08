@@ -21,6 +21,7 @@ Test.@testset "Package ParallelProcessingTools" begin
     include("test_procinit.jl")
     include("test_workerpool.jl")
     include("test_onworkers.jl")
+    include("test_ext_threadpinning.jl")
     include("test_deprecated.jl")
     include("test_docs.jl")
 end # testset
