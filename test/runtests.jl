@@ -3,7 +3,10 @@
 import Test
 
 import ThreadPinning
-ThreadPinning.Prefs.set_os_warning(false)
+
+if isdefined(ThreadPinning, :Prefs)
+    ThreadPinning.Prefs.set_os_warning(false)
+end
 
 Test.@testset "Package ParallelProcessingTools" begin
     @info "Testing with $(Base.Threads.nthreads()) Julia threads."
@@ -21,6 +24,7 @@ Test.@testset "Package ParallelProcessingTools" begin
     include("test_procinit.jl")
     include("test_workerpool.jl")
     include("test_onworkers.jl")
+    include("test_ext_threadpinning.jl")
     include("test_deprecated.jl")
     include("test_docs.jl")
 end # testset
