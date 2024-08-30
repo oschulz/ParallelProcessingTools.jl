@@ -52,4 +52,6 @@ include("testtools.jl")
         end
     end
     rmprocs(pids)
+
+    @test_deprecated pinthreads_auto() isa Nothing
 end

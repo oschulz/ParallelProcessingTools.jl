@@ -47,3 +47,12 @@ export @mp_async
 
 
 @deprecate isdefined_local(x) isassigned(x)
+
+
+@noinline function pinthreads_auto()
+    Base.depwarn("`pinthreads_auto()` is deprecated, use `ThreadPinning.pinthreads(AutoThreadPinning())` instead.",:pinthreads_auto)
+    _pinthreads_auto_impl(Val(true))
+end
+export pinthreads_auto
+
+_pinthreads_auto_impl(::Val) = nothing

@@ -1,24 +1,41 @@
 # This file is a part of ParallelProcessingTools.jl, licensed under the MIT License (MIT).
 
 
-
 """
-    pinthreads_auto()
+    struct AutoThreadPinning
 
-!!! note
-    Only has an effect if
-    [`ThreadPinning`](https://github.com/carstenbauer/ThreadPinning.jl/) is
-    loaded, and only on operating systems supported by `ThreadPinning`.
+ParallelProcessingTools default thread pinning mode.
+
+Constructor:
+
+```julia
+AutoThreadPinning(; random::Bool = false, pin_blas::Bool = false)
+```
+
+Arguments:
+
+- `random`: Use system topology based random thread pinning if no thread
+          affinity mask is set (e.g. via SLURM, `taskset`).
+
+- `blas`: Try to pin BLAS threads. Not fully functional due to bugs in
+  BLAS thread pinning (see ThreadPinning issue
+  [#105](https://github.com/carstenbauer/ThreadPinning.jl/issues/105)).
+
+Use with `ThreadPinning.pinthreads`:
+
+```julia
+using ParallelProcessingTools, ThreadPinning
+pinthreads(AutoThreadPinning())
+```
 """
-function pinthreads_auto end
-export pinthreads_auto
-
-pinthreads_auto() = _pinthreads_auto_impl(Val(true))
-_pinthreads_auto_impl(::Val) = nothing
-
+@kwdef struct AutoThreadPinning
+    random::Bool = false
+    blas::Bool = false
+end
+export AutoThreadPinning
 
 _getcpuids() = _getcpuids_impl(Val(true))
-_getcpuids_impl(::Val) = nothing
+_getcpuids_impl(::Val) = missing
 
 
 """
@@ -28,6 +45,10 @@ Get the distributed Julia worker process resources currently available.
 
 This may take some time as some code needs to be loaded on all processes.
 Automatically runs `ensure_procinit()` before querying worker resources.
+
+Note: CPU ID information will only be available if
+[`ThreadPinning`](https://github.com/carstenbauer/ThreadPinning.jl) is
+loaded.
 """
 function worker_resources()
     ensure_procinit()

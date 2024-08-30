@@ -6,8 +6,5 @@ using Test
 import ThreadPinning
 
 @testset "ext_threadpinning" begin
-    ParallelProcessingToolsThreadPinningExt = Base.get_extension(ParallelProcessingTools, :ParallelProcessingToolsThreadPinningExt)
-    @test ParallelProcessingToolsThreadPinningExt isa Module
-
-    @test pinthreads_auto() isa Nothing
+    @test ThreadPinning.pinthreads(AutoThreadPinning()) isa Nothing
 end
