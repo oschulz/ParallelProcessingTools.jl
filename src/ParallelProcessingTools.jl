@@ -9,6 +9,7 @@ using Distributed
 
 import LinearAlgebra
 import Pkg
+import Random # Required by ThreadPinning extention
 import Sockets
 
 import ClusterManagers
