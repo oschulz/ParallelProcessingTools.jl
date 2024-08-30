@@ -44,8 +44,4 @@ include("slurm.jl")
 include("htcondor.jl")
 include("deprecated.jl")
 
-@static if !isdefined(Base, :get_extension)
-    include("../ext/ParallelProcessingToolsThreadPinningExt.jl")
-end
-
 end # module
