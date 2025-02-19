@@ -194,7 +194,7 @@ ParallelProcessingTools._getcpuids_impl(::Val{true}) = ThreadPinning.getcpuids()
 else #! _threadpinning_supported
 
 
-ThreadPinning.pinthreads(ParallelProcessingTools.AutoThreadPinning) = nothing
+ThreadPinning.pinthreads(::ParallelProcessingTools.AutoThreadPinning) = nothing
 
 
 end # if _threadpinning_supported
