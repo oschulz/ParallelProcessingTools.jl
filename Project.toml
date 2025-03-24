@@ -21,7 +21,7 @@ ParallelProcessingToolsThreadPinningExt = "ThreadPinning"
 
 [compat]
 ArgCheck = "1, 2"
-ClusterManagers = "0.4.6, 1"
+ClusterManagers = "0.4.6, 1, 2"
 Distributed = "1"
 LinearAlgebra = "1"
 Logging = "1"
