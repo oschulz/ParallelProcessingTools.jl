@@ -14,14 +14,21 @@ import Pkg
 using Distributed: launch, manage, kill, init_worker, connect
 # ==================================================================
 
+export ElasticManager, elastic_worker
+
 
 # The master process listens on a well-known port
 # Launched workers connect to the master and redirect their STDOUTs to the same
 # Workers can join and leave the cluster on demand.
 
-export ElasticManager, elastic_worker
-
 const HDR_COOKIE_LEN = Distributed.HDR_COOKIE_LEN
+
+@static if Base.VERSION >= v"1.7-"
+    # Base.errormonitor() is only available in Julia 1.7+
+    my_errormonitor(t) = Base.errormonitor(t)
+else
+    my_errormonitor(t) = nothing
+end
 
 struct ElasticManager <: Distributed.ClusterManager
     active::Dict{Int, Distributed.WorkerConfig}        # active workers
@@ -47,20 +54,23 @@ struct ElasticManager <: Distributed.ClusterManager
                 error("Failed to automatically get host's IP address. Please specify `addr=` explicitly.")
             end
         end
-        
+
         l_sock = Distributed.listen(addr, port)
 
         lman = new(Dict{Int, Distributed.WorkerConfig}(), Channel{Sockets.TCPSocket}(typemax(Int)), Set{Int}(), topology, Sockets.getsockname(l_sock), manage_callback, printing_kwargs)
 
-        @async begin
+        t1 = @async begin
             while true
                 let s = Sockets.accept(l_sock)
-                    @async process_worker_conn(lman, s)
+                    t2 = @async process_worker_conn(lman, s)
+                    my_errormonitor(t2)
                 end
             end
         end
+        my_errormonitor(t1)
 
-        @async process_pending_connections(lman)
+        t3 = @async process_pending_connections(lman)
+        my_errormonitor(t3)
 
         lman
     end
@@ -153,7 +163,7 @@ function Base.show(io::IO, mgr::ElasticManager)
 
     println(iob, "  Worker connect command : ")
     print(iob, "    ", get_connect_cmd(mgr; mgr.printing_kwargs...))
-    
+
     print(io, String(take!(iob)))
 end
 
@@ -174,6 +184,22 @@ function elastic_worker(
     write(c, rpad(cookie, HDR_COOKIE_LEN)[1:HDR_COOKIE_LEN])
     stdout_to_master && redirect_stdout(c)
     Distributed.start_worker(c, cookie)
+end
+
+function get_connect_cmd(em::ElasticManager; absolute_exename=true, same_project=true, exeflags::Tuple=())
+    ip = string(em.sockname[1])
+    port = convert(Int,em.sockname[2])
+    cookie = Distributed.cluster_cookie()
+    exename = absolute_exename ? joinpath(Sys.BINDIR, Base.julia_exename()) : "julia"
+    project = same_project ? ("--project=$(Pkg.API.Context().env.project_file)",) : ()
+
+    join([
+        exename,
+        exeflags...,
+        project...,
+        "-e 'import ElasticClusterManager; ElasticClusterManager.elastic_worker(\"$cookie\",\"$ip\",$port)'"
+    ]," ")
+
 end
 
 
