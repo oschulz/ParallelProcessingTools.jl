@@ -4,7 +4,7 @@ version = "0.4.7"
 
 [deps]
 ArgCheck = "dce04be8-c92d-5529-be00-80e4d2c0e197"
-ClusterManagers = "34f1f09b-3a8b-5176-ab39-66d58a4d544e"
+ElasticClusterManager = "547eee1f-27c8-4193-bfd6-9e092c8e3331"
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
@@ -21,7 +21,7 @@ ParallelProcessingToolsThreadPinningExt = "ThreadPinning"
 
 [compat]
 ArgCheck = "1, 2"
-ClusterManagers = "0.4.6, 1"
+ElasticClusterManager = "2"
 Distributed = "1"
 LinearAlgebra = "1"
 Logging = "1"

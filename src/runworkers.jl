@@ -141,7 +141,7 @@ function ppt_cluster_manager()
 end
 
 """
-    ParallelProcessingTools.ppt_cluster_manager!(manager::CustomClusterManagers.ElasticManager)
+    ParallelProcessingTools.ppt_cluster_manager!(manager::ElasticClusterManager.ElasticManager)
 
 Set the default ParallelProcessingTools cluster manager.
 """
@@ -260,7 +260,7 @@ function _elastic_worker_startjl(
     socket_name = manager.sockname
     address = string(socket_name[1])
     port = convert(Int, socket_name[2])
-    """import ParallelProcessingTools; ParallelProcessingTools.CustomClusterManagers.elastic_worker("$cookie", "$address", $port, stdout_to_master=$redirect_output, env=$env_vec)"""
+    """import ParallelProcessingTools; ParallelProcessingTools.elastic_worker("$cookie", "$address", $port, forward_stdout=$redirect_output, env=$env_vec)"""
 end
 
 const _default_addprocs_params = Distributed.default_addprocs_params()
