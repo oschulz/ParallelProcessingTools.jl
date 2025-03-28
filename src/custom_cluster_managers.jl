@@ -7,11 +7,11 @@
 module CustomClusterManagers
 
 # ==================================================================
-using Distributed
-using Sockets
-using Pkg
+import Distributed
+import Sockets
+import Pkg
 
-import Distributed: launch, manage, kill, init_worker, connect
+using Distributed: launch, manage, kill, init_worker, connect
 # ==================================================================
 
 
@@ -23,9 +23,9 @@ export ElasticManager, elastic_worker
 
 const HDR_COOKIE_LEN = Distributed.HDR_COOKIE_LEN
 
-struct ElasticManager <: ClusterManager
-    active::Dict{Int, WorkerConfig}        # active workers
-    pending::Channel{TCPSocket}          # to be added workers
+struct ElasticManager <: Distributed.ClusterManager
+    active::Dict{Int, Distributed.WorkerConfig}        # active workers
+    pending::Channel{Sockets.TCPSocket}          # to be added workers
     terminated::Set{Int}             # terminated worker ids
     topology::Symbol
     sockname
@@ -37,24 +37,24 @@ struct ElasticManager <: ClusterManager
         topology=:all_to_all, manage_callback=elastic_no_op_callback, printing_kwargs=()
     )
         Distributed.init_multi()
-        cookie !== nothing && cluster_cookie(cookie)
+        cookie !== nothing && Distributed.cluster_cookie(cookie)
 
         # Automatically check for the IP address of the local machine
         if addr == :auto
             try
-                addr = Sockets.getipaddr(IPv4)
+                addr = Sockets.getipaddr(Sockets.IPv4)
             catch
                 error("Failed to automatically get host's IP address. Please specify `addr=` explicitly.")
             end
         end
         
-        l_sock = listen(addr, port)
+        l_sock = Distributed.listen(addr, port)
 
-        lman = new(Dict{Int, WorkerConfig}(), Channel{TCPSocket}(typemax(Int)), Set{Int}(), topology, getsockname(l_sock), manage_callback, printing_kwargs)
+        lman = new(Dict{Int, Distributed.WorkerConfig}(), Channel{Sockets.TCPSocket}(typemax(Int)), Set{Int}(), topology, Sockets.getsockname(l_sock), manage_callback, printing_kwargs)
 
         @async begin
             while true
-                let s = accept(l_sock)
+                let s = Sockets.accept(l_sock)
                     @async process_worker_conn(lman, s)
                 end
             end
@@ -72,10 +72,10 @@ ElasticManager(addr, port, cookie) = ElasticManager(;addr=addr, port=port, cooki
 
 elastic_no_op_callback(::ElasticManager, ::Integer, ::Symbol) = nothing
 
-function process_worker_conn(mgr::ElasticManager, s::TCPSocket)
+function process_worker_conn(mgr::ElasticManager, s::Sockets.TCPSocket)
     @debug "ElasticManager got new worker connection"
     # Socket is the worker's STDOUT
-    wc = WorkerConfig()
+    wc = Distributed.WorkerConfig()
     wc.io = s
 
     # Validate cookie
@@ -83,7 +83,7 @@ function process_worker_conn(mgr::ElasticManager, s::TCPSocket)
     if length(cookie) < HDR_COOKIE_LEN
         error("Cookie read failed. Connection closed by peer.")
     end
-    self_cookie = cluster_cookie()
+    self_cookie = Distributed.cluster_cookie()
     for i in 1:HDR_COOKIE_LEN
         if UInt8(self_cookie[i]) != cookie[i]
             println(i, " ", self_cookie[i], " ", cookie[i])
@@ -98,7 +98,7 @@ function process_pending_connections(mgr::ElasticManager)
     while true
         wait(mgr.pending)
         try
-            addprocs(mgr; topology=mgr.topology)
+            Distributed.addprocs(mgr; topology=mgr.topology)
         catch e
             showerror(stderr, e)
             Base.show_backtrace(stderr, Base.catch_backtrace())
@@ -106,11 +106,11 @@ function process_pending_connections(mgr::ElasticManager)
     end
 end
 
-function launch(mgr::ElasticManager, params::Dict, launched::Array, c::Condition)
+function Distributed.launch(mgr::ElasticManager, params::Dict, launched::Array, c::Condition)
     # The workers have already been started.
     while isready(mgr.pending)
         @debug "ElasticManager.launch new worker"
-        wc=WorkerConfig()
+        wc=Distributed.WorkerConfig()
         wc.io = take!(mgr.pending)
         push!(launched, wc)
     end
@@ -118,7 +118,7 @@ function launch(mgr::ElasticManager, params::Dict, launched::Array, c::Condition
     notify(c)
 end
 
-function manage(mgr::ElasticManager, id::Integer, config::WorkerConfig, op::Symbol)
+function Distributed.manage(mgr::ElasticManager, id::Integer, config::Distributed.WorkerConfig, op::Symbol)
     if op == :register
         @debug "ElasticManager registering process id $id"
         mgr.active[id] = config
@@ -173,7 +173,7 @@ function elastic_worker(
     c = connect(addr, port)
     write(c, rpad(cookie, HDR_COOKIE_LEN)[1:HDR_COOKIE_LEN])
     stdout_to_master && redirect_stdout(c)
-    start_worker(c, cookie)
+    Distributed.start_worker(c, cookie)
 end
 
 
