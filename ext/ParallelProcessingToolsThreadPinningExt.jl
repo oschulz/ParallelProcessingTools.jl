@@ -1,3 +1,5 @@
+# This file is a part of ParallelProcessingTools.jl, licensed under the MIT License (MIT).
+
 module ParallelProcessingToolsThreadPinningExt
 
 import ParallelProcessingTools
@@ -200,4 +202,4 @@ ThreadPinning.pinthreads(::ParallelProcessingTools.AutoThreadPinning) = nothing
 end # if _threadpinning_supported
     
 
-end # module ChangesOfVariablesInverseFunctionsExt
+end # module ParallelProcessingToolsThreadPinningExt
