@@ -13,13 +13,37 @@ const _NonLinIndexView = SubArray{<:Any,<:Any,<:Array,<:Any,false}
 pp_module_adapter(Base.@nospecialize(module_name::Val)) = throw(ArgumentError("No default pp_adapter defined for module $(only(typeof(module_name).parameters))"))
 
 
-const CurriedAdapt{Adapter} = Base.Fix1{typeof(Adapt.adapt), Adapter}
+const _CurriedAdapt{Adapter} = Base.Fix1{typeof(Adapt.adapt), Adapter}
+
+
+"""
+    adaptfunc(to)
+
+Return a function that adapts objects to 
+
+Returns a function that is semantically equivalent to
+`obj -> Adapt.adapt(pp_adapter(to), obj)`.
+
+Examples:
+
+```julia
+⋮ = adaptfunc(Strided.StridedView)
+⋰ = adaptfunc(StrideArrays.StrideArray)
+# etc.
+```
+
+but you can also use (potentially less type-stable):
+
+```julia
+adaptfunc(Strided)
+adaptfunc(StrideArrays)
+# etc.
+```
+"""
+function adaptfunc end
 
 @inline adaptfunc(to::Adapter) where Adapter = Base.Fix1(Adapt.adapt, pp_adapter(to))
 @inline adaptfunc(::Type{Adapter}) where Adapter = Base.Fix1(Adapt.adapt, pp_adapter(Adapter))
-
-# ToDo (maybe): adaptfunct with multiple arguments, returning a Tuple?
-# @inline adaptfunc(adapters::Vararg{Any,N}) where N = map(adaptfunc, adapters)
 
 
 """
@@ -35,7 +59,7 @@ Semanically equivalent to `af(f)(map(af, args)...)`.
 """
 function adapted_call end
 
-@inline adapted_call(f::F, af::CurriedAdapt, args...) where F = af(f)(map(af, args)...)
+@inline adapted_call(f::F, af::_CurriedAdapt, args...) where F = af(f)(map(af, args)...)
 @inline adapted_call(f::F, to::A, args...) where {F,A} = adapted_call(f, adaptfunc(to), args...)
 @inline adapted_call(f::F, ::Type{Adapter}, args...) where {F,Adapter} = adapted_call(f, adaptfunc(Adapter), args...)
 
@@ -64,40 +88,38 @@ See also [`adaptfunc`](@ref).
 """
 function adapted_bcast end
 
-@inline adapted_bcast(f::F, af::CurriedAdapt, args...) where F =  broadcast(af(f), map(af, args)...)
+@inline adapted_bcast(f::F, af::_CurriedAdapt, args...) where F =  broadcast(af(f), map(af, args)...)
 @inline adapted_bcast(f::F, to::A, args...) where {F,A} = adapted_bcast(f, adaptfunc(to), args...)
 @inline adapted_bcast(f::F, ::Type{Adapter}, args...) where {F,Adapter} = adapted_bcast(f, adaptfunc(Adapter), args...)
 
-@inline adapted_bcast!(f::F, af::CurriedAdapt, args...) where F = broadcast!(af(f), map(af, args)...)
+@inline adapted_bcast!(f::F, af::_CurriedAdapt, args...) where F = broadcast!(af(f), map(af, args)...)
 @inline adapted_bcast!(f::F, to::A, args...) where {F,A} = adapted_bcast!(f, adaptfunc(to), args...)
 @inline adapted_bcast!(f::F, ::Type{Adapter}, args...) where {F,Adapter} = adapted_bcast!(f, adaptfunc(Adapter), args...)
 
 
 """
-    struct PPTypeAdapter{T} end
+    struct SpecialTypeAdapter{T} end
 
-Adapter to an (array) type `T` (for `Adapt.adapt_storage`) that requires
-special handling. By default, `Adapt.adapt_storage(::PPTypeAdapter, obj)` will
-return `obj` unchanged.
+Adapter to an (array) type `T` (for `Adapt`) that requires special handling.
 
 # Implementation
 
-`PPTypeAdapter` instances should result from calls to
+`SpecialTypeAdapter` instances should result from calls to
 `ParallelProcessingTools.pp_adapter(to_something)`, they should not be
 constructed by user code directly.
-"""
-struct PPTypeAdapter{T} end
 
-const PPTypeAdaptFunc{T} = CurriedAdapt{PPTypeAdapter{T}}
+There is no default specialization for
+`Adapt.adapt_storage(::SpecialTypeAdapter, obj)`, it should be specialized for
+each type `T` individually.
+"""
+struct SpecialTypeAdapter{T} end
+
+const PPTypeAdaptFunc{T} = _CurriedAdapt{SpecialTypeAdapter{T}}
 Base.show(@nospecialize(io::IO), @nospecialize(f::PPTypeAdaptFunc{T})) where T = print(io, "adaptfunc($(nameof(T)))")
 Base.show(@nospecialize(io::IO), ::MIME"text/plain", @nospecialize(f::PPTypeAdaptFunc{T})) where T = show(io, f)
 
-@inline Adapt.adapt_storage(to::PPTypeAdapter, A::AbstractArray) = _ppt_adapt_storage(to, A)
-@inline _ppt_adapt_storage(::PPTypeAdapter, A::AbstractArray) = A
-
-
-@inline pp_adapter(::Type{Array}) = PPTypeAdapter{Array}()
-_ppt_adapt_storage(::PPTypeAdapter{Array}, A::AbstractArray) = Array(A)
+@inline pp_adapter(::Type{Array}) = SpecialTypeAdapter{Array}()
+Adapt.adapt_storage(::SpecialTypeAdapter{Array}, A::AbstractArray) = Array(A)
 
 
 # ToDo (maybe): Add: parallel_bcast and parallel_bcast like
@@ -139,10 +161,5 @@ function _threads_parallel_copyto!(A, B)
         end
     end
 
-    return A
-end
-
-function parallel_copyto!(A::StructArray{T,N}, B::StructArray{T,N}) where {T,N}
-    map(parallel_copyto!, StructArrays.components(A), StructArrays.components(B))
     return A
 end

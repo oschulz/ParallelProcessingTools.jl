@@ -3,12 +3,16 @@
 module ParallelProcessingToolsStrideArraysExt
 
 using ParallelProcessingTools
-using ParallelProcessingTools: PPTypeAdapter, _LinIndexCPUArrayLike
+using ParallelProcessingTools: SpecialTypeAdapter, _LinIndexCPUArrayLike
 import ParallelProcessingTools: pp_adapter, pp_module_adapter, _ppt_adapt_storage
-    
-@inline pp_adapter(::Type{StrideArrays.StrideArray}) = PPTypeAdapter{StrideArrays.StrideArray}()
+import Adapt
+
+import StrideArrays
+
+
+@inline pp_adapter(::Type{StrideArrays.StrideArray}) = SpecialTypeAdapter{StrideArrays.StrideArray}()
 @inline pp_module_adapter(::Val{nameof(StrideArrays)}) = pp_adapter(StrideArrays.StrideArray)
 # Only adapt CPU arrays with linear indexing to StrideArray:
-_ppt_adapt_storage(::PPTypeAdapter{StrideArrays.StrideArray}, A::_LinIndexCPUArrayLike) = StrideArrays.StrideArray(A)
+Adapt.adapt_storage(::SpecialTypeAdapter{StrideArrays.StrideArray}, A::_LinIndexCPUArrayLike) = StrideArrays.StrideArray(A)
 
 end # module ParallelProcessingToolsStrideArraysExt

@@ -20,6 +20,8 @@ using Parameters: @with_kw
 
 using ElasticClusterManager: ElasticManager, elastic_worker
 
+import Adapt
+
 # For backward compatibility:
 module CustomClusterManagers
     import ElasticClusterManager.ElasticManager
