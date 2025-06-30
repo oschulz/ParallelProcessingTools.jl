@@ -159,3 +159,8 @@ To get an exception "in hand" for further analysis, you can use the macro [`@ret
 File handling can become more challenging when working in a parallel and possibly distributed fashion. Code or whole workers can crash, resulting in corrupt files, or workers may become disconnected, but still write files and clash with restarted code (resulting in race conditions and may also result in corrupt files).
 
 ParallelProcessingTools provides the functions [`write_files`](@ref) and [`read_files`](@ref) to implement atomic file operations, on a best-effort basis (depending on the operating system and underlying file systems).
+
+
+# Parallelized operations
+
+Use [`parallel_copyto!`](@ref) to copy data in parallel (tries to use multi-threading for CPU arrays).
