@@ -46,7 +46,7 @@ end
 
 
 @testset "onworkers" begin
-    runmode = OnLocalhost(n = 2)
+    runmode = LocalRun(n = 2)
 
     @testset "runworkers $(nameof(typeof(runmode)))" begin
         test_runprocs(2) do
@@ -86,7 +86,7 @@ end
     @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(gen_mayfail(1), "bar"; tries = 2, label = "mayfail")
     @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(mytask, 2, "foo", maxtime = 0.5, tries = 2)
     
-    runworkers(OnLocalhost(n = 2))
+    runworkers(LocalRun(n = 2))
 
     timer = Timer(30)
     @wait_while nprocs() < 3 && isopen(timer)
@@ -114,7 +114,7 @@ end
     @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(mytask, 2, "foo", time = 0.5, tries = 2)
     @test nprocs() == 1
 
-    addworkers(OnLocalhost(2))
+    addworkers(LocalRun(2))
 
     @test @inferred(onworker(mytask)) == ()
     @test @inferred(onworker(mytask, 1, "foo")) == ("foo", )
