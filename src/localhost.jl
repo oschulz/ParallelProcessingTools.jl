@@ -1,7 +1,7 @@
 # This file is a part of ParallelProcessingTools.jl, licensed under the MIT License (MIT).
 
 """
-    LocalRun(;
+    OnLocalhost(;
         n::Integer = 1
         env::Dict{String,String} = Dict{String,String}()
         julia_flags::Cmd = _default_julia_flags()
@@ -13,7 +13,7 @@ Mode that runs `n` worker processes on the current host.
 Example:
 
 ```julia
-runmode = LocalRun(n = 4)
+runmode = OnLocalhost(n = 4)
 task, n = runworkers(runmode)
 
 Threads.@async begin
@@ -28,17 +28,15 @@ Workers can also be started manually, use
 [`worker_start_command(runmode)`](@ref) to get the system (shell) command and
 run it from a separate process or so.
 """
-@with_kw struct LocalRun <: DynamicAddProcsMode
+@with_kw struct OnLocalhost <: DynamicAddProcsMode
     n::Int
     julia_flags::Cmd = _default_julia_flags()
     dir = pwd()
     env::Dict{String,String} = Dict{String,String}()
 end
-export LocalRun
+export OnLocalhost
 
-@deprecate OnLocalhost LocalRun
-
-function worker_start_command(runmode::LocalRun, manager::ElasticManager)
+function worker_start_command(runmode::OnLocalhost, manager::ElasticManager)
     julia_flags = runmode.julia_flags
     dir = runmode.dir
 
@@ -54,7 +52,7 @@ function worker_start_command(runmode::LocalRun, manager::ElasticManager)
     return worker_cmd, runmode.n, runmode.n
 end
 
-function runworkers(runmode::LocalRun, manager::ElasticManager)
+function runworkers(runmode::OnLocalhost, manager::ElasticManager)
     start_cmd, m, n = worker_start_command(runmode, manager)
 
     task = Threads.@async begin
