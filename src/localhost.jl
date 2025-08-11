@@ -38,7 +38,7 @@ export OnLocalhost
 
 function worker_start_command(runmode::OnLocalhost, manager::ElasticManager)
     julia_flags = runmode.julia_flags
-    dir = runmode.dir
+    dir = replace(runmode.dir, '\\' => '/')
 
     jl_threads_flag = any(occursin.(Ref("--threads"), string.(julia_flags))) ? `` : `--threads=$(nthreads())`
     jl_dir_flags = `-e "cd(\"$(dir)\")"`
