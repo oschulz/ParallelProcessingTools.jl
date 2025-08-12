@@ -1,11 +1,11 @@
 name = "ParallelProcessingTools"
 uuid = "8e8a01fc-6193-5ca1-a2f1-20776dae4199"
-version = "0.4.8"
+version = "0.4.9"
 
 [deps]
 ArgCheck = "dce04be8-c92d-5529-be00-80e4d2c0e197"
-ElasticClusterManager = "547eee1f-27c8-4193-bfd6-9e092c8e3331"
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
+ElasticClusterManager = "547eee1f-27c8-4193-bfd6-9e092c8e3331"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 Parameters = "d96e819e-fc66-5662-9728-84c9c7592b0a"
@@ -21,8 +21,8 @@ ParallelProcessingToolsThreadPinningExt = "ThreadPinning"
 
 [compat]
 ArgCheck = "1, 2"
-ElasticClusterManager = "2"
 Distributed = "1"
+ElasticClusterManager = "2"
 LinearAlgebra = "1"
 Logging = "1"
 Parameters = "0.12, 0.13"
