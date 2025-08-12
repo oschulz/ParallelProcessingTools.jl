@@ -1,7 +1,7 @@
 # This file is a part of ParallelProcessingTools.jl, licensed under the MIT License (MIT).
 
 """
-    SlurmRun(;
+    OnSlurm(;
         slurm_flags::Cmd = {defaults}
         julia_flags::Cmd = {defaults}
         dir = pwd()
@@ -20,7 +20,7 @@ Workers are started with current directory set to `dir`.
 Example:
 
 ```julia
-runmode = SlurmRun(slurm_flags = `--ntasks=4 --cpus-per-task=8 --mem-per-cpu=8G`)
+runmode = OnSlurm(slurm_flags = `--ntasks=4 --cpus-per-task=8 --mem-per-cpu=8G`)
 task = runworkers(runmode)
 
 Threads.@async begin
@@ -35,19 +35,20 @@ Workers can also be started manually, use
 [`worker_start_command(runmode)`](@ref) to get the `srun` start command and
 run it from a separate process or so.
 """
-@with_kw struct SlurmRun <: DynamicAddProcsMode
+@with_kw struct OnSlurm <: DynamicAddProcsMode
     slurm_flags::Cmd = _default_slurm_flags()
     julia_flags::Cmd = _default_julia_flags()
     dir = pwd()
     env::Dict{String,String} = Dict{String,String}()
     redirect_output::Bool = true
 end
-export SlurmRun
+export OnSlurm
 
+@deprecate SlurmRun OnSlurm
 
 const _g_slurm_nextjlstep = Base.Threads.Atomic{Int}(1)
 
-function worker_start_command(runmode::SlurmRun, manager::ElasticManager)
+function worker_start_command(runmode::OnSlurm, manager::ElasticManager)
     slurm_flags = runmode.slurm_flags
     julia_flags = runmode.julia_flags
     dir = runmode.dir
@@ -99,7 +100,7 @@ function _slurm_mem_per_task(tc::NamedTuple)
 end
 
 
-function runworkers(runmode::SlurmRun, manager::ElasticManager)
+function runworkers(runmode::OnSlurm, manager::ElasticManager)
     srun_cmd, m, n = worker_start_command(runmode, manager)
     @info "Starting SLURM job: $srun_cmd"
     task = Threads.@async begin

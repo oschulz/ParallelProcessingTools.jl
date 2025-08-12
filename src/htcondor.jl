@@ -1,7 +1,7 @@
 # This file is a part of ParallelProcessingTools.jl, licensed under the MIT License (MIT).
 
 """
-    HTCondorRun(;
+    OnHTCondor(;
         n::Int = 1
         condor_flags::Cmd = _default_condor_flags()
         condor_settings::Dict{String,String} = Dict{String,String}()
@@ -19,7 +19,7 @@ Condor submit script and steering `.sh` files are stored in `jobfile_dir`.
 Example:
 
 ```julia-repl
-julia> runmode = HTCondorRun(n = 10; condor_settings=Dict("universe" => "vanilla", "+queue" => "short", "request_memory" => "4GB"))
+julia> runmode = OnHTCondor(n = 10; condor_settings=Dict("universe" => "vanilla", "+queue" => "short", "request_memory" => "4GB"))
 task = runworkers(runmode)
 
 julia> runworkers(runmode)
@@ -39,7 +39,7 @@ Workers can also be started manually, use
 [`worker_start_command(runmode)`](@ref) to get the `condor_submit` start command and
 run it from a separate process or so.
 """
-@with_kw struct HTCondorRun <: DynamicAddProcsMode
+@with_kw struct OnHTCondor <: DynamicAddProcsMode
     n::Int = 1
     condor_flags::Cmd = _default_condor_flags()
     condor_settings::Dict{String,String} = Dict{String,String}()
@@ -49,12 +49,14 @@ run it from a separate process or so.
     env::Dict{String,String} = Dict{String,String}()
     redirect_output::Bool = true
 end
-export HTCondorRun
+export OnHTCondor
+
+@deprecate HTCondorRun OnHTCondor
 
 _default_condor_flags() = ``
 const _g_condor_nextjlstep = Base.Threads.Atomic{Int}(1)
 
-function worker_start_command(runmode::HTCondorRun, manager::ElasticManager)
+function worker_start_command(runmode::OnHTCondor, manager::ElasticManager)
     flags = runmode.condor_flags
     n_workers = runmode.n
     temp_name = tempname(runmode.jobfile_dir)
@@ -66,7 +68,7 @@ function worker_start_command(runmode::HTCondorRun, manager::ElasticManager)
     return `condor_submit $flags $submit_file_path`, 1, n_workers
 end
 
-function _generate_condor_worker_script(filename, runmode::HTCondorRun, manager::ElasticManager)
+function _generate_condor_worker_script(filename, runmode::OnHTCondor, manager::ElasticManager)
     julia_flags = runmode.julia_flags
 
     request_memory = get(runmode.condor_settings, "request_memory", "2GB")
@@ -94,7 +96,7 @@ function _generate_condor_worker_script(filename, runmode::HTCondorRun, manager:
     end
 end
 
-function _generate_condor_submit_file(submit_file_path, worker_script_path, runmode::HTCondorRun)
+function _generate_condor_submit_file(submit_file_path, worker_script_path, runmode::OnHTCondor)
     jlstep = atomic_add!(_g_condor_nextjlstep, 1)
     jobname = "julia-$(getpid())-$jlstep"
     default_dict = Dict(
@@ -117,7 +119,7 @@ function _generate_condor_submit_file(submit_file_path, worker_script_path, runm
     end
 end
 
-function runworkers(runmode::HTCondorRun, manager::ElasticManager)
+function runworkers(runmode::OnHTCondor, manager::ElasticManager)
     run_cmd, m, n = worker_start_command(runmode, manager)
     @info "Submitting HTCondor job: $run_cmd"
     process = run(run_cmd)
