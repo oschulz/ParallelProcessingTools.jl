@@ -38,6 +38,7 @@ export OnLocalhost
 
 function worker_start_command(runmode::OnLocalhost, manager::ElasticManager)
     julia_flags = runmode.julia_flags
+    # Doesn't run on Windows otherwise:
     dir = replace(runmode.dir, '\\' => '/')
 
     jl_threads_flag = any(occursin.(Ref("--threads"), string.(julia_flags))) ? `` : `--threads=$(nthreads())`
