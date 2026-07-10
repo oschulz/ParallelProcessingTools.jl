@@ -70,7 +70,7 @@ function worker_start_command(runmode::OnSlurm, manager::ElasticManager)
 
     worker_cmd = worker_local_startcmd(
         manager;
-        julia_flags = `$julia_flags $additional_julia_flags`,
+        julia_flags = additional_julia_flags,
         redirect_output = runmode.redirect_output, env = runmode.env
     )
 
