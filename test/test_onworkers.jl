@@ -103,6 +103,23 @@ end
         @return_exceptions onworker(() -> throw(MyExceptionNoRetry("no retry")), label = "noretry")
     ) isa MyExceptionNoRetry
 
+    @testset "worker loss" begin
+        # Worker losses don't count against tries, but are capped at 3 * tries:
+        pids = classic_addprocs(4)
+        die_pool = FlexWorkerPool{WorkerPool}(pids, init_workers = false)
+        @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(
+            () -> exit(), pool = die_pool, label = "worker_killer"
+        )
+        @test !any(in(procs()), pids)
+
+        # Recovers if a worker is lost and another can take over:
+        pids2 = classic_addprocs(2)
+        mixed_pool = FlexWorkerPool{WorkerPool}([myid(), pids2[1]], init_workers = false)
+        @test onworker(() -> (myid() == 1 ? 42 : exit()), pool = mixed_pool, label = "lossy") == 42
+        @test !(pids2[1] in procs())
+        stopworkers()
+    end
+
     runworkers(OnLocalhost(n = 2))
 
     timer = Timer(30)

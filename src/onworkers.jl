@@ -48,166 +48,132 @@ terminated.
 
 If a problem occurs (maxtime or worker failure) while running the activity,
 reschedules the task if the maximum number of tries has not yet been reached,
-otherwise throws an exception.
+otherwise throws an exception. Worker failures do not count against `tries`,
+but only up to `3 * tries` worker failures are tolerated.
 """
-function onworker end
+function onworker(
+    f::Function, args...;
+    @nospecialize(pool::AbstractWorkerPool = ppt_worker_pool()),
+    @nospecialize(maxtime::Real = 0), @nospecialize(tries::Integer = 1), @nospecialize(label::AbstractString = "")
+)
+    R = Base.promote_op(f, map(typeof, args)...)
+    untyped_result = _on_worker_impl(f, args, pool, Float64(maxtime), Int(tries), String(label))
+    return convert(R, untyped_result)::R
+end
 export onworker
 
-function onworker(
-    f::Function;
-    @nospecialize(pool::AbstractWorkerPool = ppt_worker_pool()),
-    @nospecialize(maxtime::Real = 0), @nospecialize(tries::Integer = 1), @nospecialize(label::AbstractString = "")
-)
-    R = _return_type(f, ())
-    untyped_result = _on_worker_impl(f, (), pool, Float64(maxtime), Int(tries), String(label))
-    return convert(R, untyped_result)::R
+
+# Outcome of a single attempt to run an activity on a worker:
+struct _AttemptSucceeded; value::Any; end
+struct _AttemptFailed; err::Exception; retriable::Bool; end
+struct _AttemptTimedOut; elapsed::Float64; end
+struct _WorkerUnusable; err::Exception; end
+
+const _AttemptOutcome = Union{_AttemptSucceeded,_AttemptFailed,_AttemptTimedOut,_WorkerUnusable}
+
+function _attempt_onworker(@nospecialize(f::Function), @nospecialize(args::Tuple), worker::Int, maxtime::Float64)
+    t_start = time()
+    try
+        future_result = remotecall(f, worker, args...)
+        if maxtime > 0
+            wait_for_any(future_result, maxtime = maxtime)
+            isready(future_result) || return _AttemptTimedOut(time() - t_start)
+        end
+        # With a `remotecall` to the current process, fetch will return exceptions
+        # originating in the called function, while if run on a remote process they
+        # will be thrown to the caller of fetch. `@return_exceptions` unifies this:
+        result = @return_exceptions fetch(future_result)
+        return result isa Exception ? _classify_failure(result) : _AttemptSucceeded(result)
+    catch err
+        if err isa Union{ProcessExitedException,RemoteException}
+            return _classify_failure(err)
+        else
+            rethrow()
+        end
+    end
 end
 
-function onworker(
-    f::Function, arg1, args...;
-    @nospecialize(pool::AbstractWorkerPool = ppt_worker_pool()),
-    @nospecialize(maxtime::Real = 0), @nospecialize(tries::Integer = 1), @nospecialize(label::AbstractString = "")
-)
-    all_args = (arg1, args...)
-    R = _return_type(f, all_args)
-    untyped_result = _on_worker_impl(f, all_args, pool, Float64(maxtime), Int(tries), String(label))
-
-    @assert !(untyped_result isa Exception)
-    return convert(R, untyped_result)::R
+function _classify_failure(err::Exception)
+    orig_err = inner_exception(err)
+    if orig_err isa ProcessExitedException
+        return _WorkerUnusable(err)
+    elseif orig_err isa MethodError && _worker_seems_corrupted(orig_err)
+        return _WorkerUnusable(err)
+    else
+        return _AttemptFailed(err, _should_retry(err))
+    end
 end
 
-_return_type(f, args::Tuple) = Core.Compiler.return_type(f, typeof(args))
-
+# A method that exists locally but is missing on the worker indicates a
+# corrupted (serializer-)state on the worker:
+function _worker_seems_corrupted(err::MethodError)
+    func_module = nameof(parentmodule(parentmodule(typeof(err.f))))
+    func_module == :Serialization && hasmethod(err.f, map(typeof, err.args))
+end
 
 @noinline function _on_worker_impl(
     @nospecialize(f::Function), @nospecialize(args::Tuple),
     @nospecialize(pool::AbstractWorkerPool), maxtime::Float64, tries::Int, label::String
 )
+    activity = _Activity(f, label, tries)
     n_tries::Int = 0
-    while n_tries < tries
-        n_tries += 1
-        activity = _Activity(f, label, tries)
+    n_workers_lost::Int = 0
+    max_workers_lost = 3 * tries
 
+    while true
+        n_tries += 1
         @debug "Preparing to run $activity, taking a worker from $(getlabel(pool))"
         worker = take!(pool)
 
-        start_time = time()
-        elapsed_time = zero(start_time)
-
-        try
+        outcome::_AttemptOutcome = try
             @debug "Running $activity on worker $worker"
-
-            future_result = remotecall(f, worker, args...)
-
-            result_isready = try
-                if maxtime > 0
-                    # May throw an exception:
-                    wait_for_any(future_result, maxtime = maxtime)
-                else
-                    # May throw an exception:
-                    wait(future_result)
-                end
-                elapsed_time = time() - start_time
-
-                isready(future_result)
-            catch err
-                # Testing if future is ready may throw exceptions from f already:
-                if _should_retry(err)
-                    if !(n_tries < tries)
-                        inner_err = inner_exception(err)
-                        throw(MaxTriesExceeded(tries, n_tries, inner_err))
-                    else
-                        @debug "Will retry $activity ($n_tries tries so far) due to" err
-                    end
-                else
-                    throw(err)
-                end
-                true
-            end
-
-            if result_isready
-                # With a `remotecall` to the current process, fetch will return exceptions
-                # originating in the called function, while if run on a remote process they
-                # will be thrown to the caller of fetch. We need to unify this behavior:
-
-                fetched_result = @return_exceptions fetch(future_result)
-
-                if fetched_result isa Exception
-                    err = fetched_result
-                    if _should_retry(err)
-                        if !(n_tries < tries)
-                            inner_err = inner_exception(err)
-                            throw(MaxTriesExceeded(tries, n_tries, inner_err))
-                        else
-                            @debug "Will retry $activity ($n_tries tries so far) due to" err
-                        end
-                    else
-                        throw(err)
-                    end
-                else
-                    @debug "Worker $worker ran $activity successfully in $elapsed_time s"
-                    return fetched_result
-                end
-            else
-                # Sanity check: if we got here, we must have timed out:
-                @assert maxtime > 0 && elapsed_time > maxtime
-
-                @warn "Running $activity on worker $worker timed out after $elapsed_time s (max runtime $(maxtime) s)"
-
-                if worker == myid()
-                    @warn "Will not terminate main process $worker, making it available again, but it may still be running timed-out $activity"
-                else
-                    @warn "Terminating worker $worker due to activity maxtime"
-                    rmprocs(worker)
-                end
-
-                if !(n_tries < tries)
-                    err = TimelimitExceeded(maxtime, elapsed_time)
-                    @debug "Giving up on $activity after $n_tries tries due to" err
-                    throw(MaxTriesExceeded(tries, n_tries, err))
-                end
-            end
-        catch err
-            if err isa ProcessExitedException
-                @warn "Worker $worker seems to have terminated during $activity"
-                # This try doesn't count:
-                n_tries -= 1
-                # Make certain that worker is really gone:
-                rmprocs(worker)
-            elseif err isa RemoteException
-                orig_err = inner_exception(err)
-                if orig_err isa MethodError
-                    func = orig_err.f
-                    func_args = orig_err.args
-                    func_name = string(typeof(func))
-                    func_module = nameof(parentmodule(parentmodule(typeof(func))))
-                    func_hasmethod_local = hasmethod(func, map(typeof, func_args))
-                    if func_module == :Serialization && func_hasmethod_local
-                        @warn "Function $func_name may be corrupted on worker $worker (missing method), terminating worker."
-                        rmprocs(worker)
-                        # This try doesn't count:
-                        n_tries -= 1
-                    else
-                        rethrow()
-                    end
-                else
-                    @debug "Encountered exception while trying to run $activity on worker $worker:" orig_err
-                    rethrow()
-                end
-            elseif err isa MaxTriesExceeded
-                retry_reason = err.retry_reason
-                @debug "Giving up on $activity after $(err.n_tries) tries due to" retry_reason
-                rethrow()
-            else
-                @debug "Encountered unexpected exception while trying to run $activity on worker $worker:" err
-                rethrow()
-            end
+            _attempt_onworker(f, args, worker, maxtime)
         finally
             put!(pool, worker)
         end
+
+        if outcome isa _AttemptSucceeded
+            @debug "Worker $worker ran $activity successfully"
+            return outcome.value
+        elseif outcome isa _WorkerUnusable
+            orig_err = inner_exception(outcome.err)
+            @warn "Worker $worker became unusable during $activity, removing it." orig_err
+            rmprocs(worker)
+            # Worker loss doesn't count as a try, but don't tolerate it indefinitely:
+            n_tries -= 1
+            n_workers_lost += 1
+            if n_workers_lost > max_workers_lost
+                throw(MaxTriesExceeded(tries, n_tries, orig_err))
+            end
+        elseif outcome isa _AttemptTimedOut
+            @warn "Running $activity on worker $worker timed out after $(outcome.elapsed) s (max runtime $maxtime s)"
+            if worker == myid()
+                # ToDo: Cancel the task running the timed-out activity, once Julia
+                # supports robust task cancellation
+                # (see https://github.com/JuliaLang/julia/pull/60281):
+                @warn "Will not terminate main process $worker, making it available again, but it may still be running timed-out $activity"
+            else
+                @warn "Terminating worker $worker due to activity maxtime"
+                rmprocs(worker)
+            end
+            if !(n_tries < tries)
+                err = TimelimitExceeded(maxtime, outcome.elapsed)
+                @debug "Giving up on $activity after $n_tries tries due to" err
+                throw(MaxTriesExceeded(tries, n_tries, err))
+            end
+        elseif outcome isa _AttemptFailed
+            err = outcome.err
+            if !outcome.retriable
+                @debug "Encountered exception while trying to run $activity on worker $worker:" inner_exception(err)
+                throw(err)
+            elseif !(n_tries < tries)
+                @debug "Giving up on $activity after $n_tries tries due to" err
+                throw(MaxTriesExceeded(tries, n_tries, inner_exception(err)))
+            else
+                @debug "Will retry $activity ($n_tries tries so far) due to" err
+            end
+        end
     end
-    # Should never reach this point:
-    @assert false
 end
 
 
