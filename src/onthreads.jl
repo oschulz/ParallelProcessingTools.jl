@@ -98,7 +98,6 @@ export @onthreads
 
 function ThreadLocal{T}(f::Base.Callable) where {T}
     result = ThreadLocal{T}(undef)
-    result.value
     @onthreads allthreads() result.value[threadid()] = f()
     result
 end
@@ -144,7 +143,6 @@ macro mt_out_of_order(ex)
                 exprs[i] = esc(exprs[i])
             end
         elseif exprs[i] isa Expr
-            ftvar = gensym()
             exprs[i] = :(push!($tasks, Base.Threads.@spawn($(esc(exprs[i])))))
             push!(handle_results, :(wait(popfirst!($tasks))))
         else

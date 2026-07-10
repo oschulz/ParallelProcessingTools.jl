@@ -196,7 +196,7 @@ _return_type(f, args::Tuple) = Core.Compiler.return_type(f, typeof(args))
                 end
             elseif err isa MaxTriesExceeded
                 retry_reason = err.retry_reason
-                @debug "Giving up on $activity after $err.n_tries tries due to" retry_reason
+                @debug "Giving up on $activity after $(err.n_tries) tries due to" retry_reason
                 rethrow()
             else
                 @debug "Encountered unexpected exception while trying to run $activity on worker $worker:" err
