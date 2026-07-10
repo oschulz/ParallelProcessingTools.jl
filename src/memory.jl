@@ -75,5 +75,5 @@ export memory_limit!
         return rlim[].cur, rlim[].max
     end
 else
-    memory_limit!(soft_limit::Integer, hard_limit::Integer) = Int64(-1), Int64(-1)
+    memory_limit!(soft_limit::Integer, hard_limit::Integer = Int64(-1)) = Int64(-1), Int64(-1)
 end
