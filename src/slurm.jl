@@ -21,7 +21,7 @@ Example:
 
 ```julia
 runmode = OnSlurm(slurm_flags = `--ntasks=4 --cpus-per-task=8 --mem-per-cpu=8G`)
-task = runworkers(runmode)
+task, n = runworkers(runmode)
 
 Threads.@async begin
     wait(task)

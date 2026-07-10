@@ -8,12 +8,12 @@
 
     FlexWorkerPool(; caching = false, withmyid::Bool = true, kwargs...)
 
-An flexible worker pool, intended to work with cluster managers that may
+A flexible worker pool, intended to work with cluster managers that may
 add and remove Julia processes dynamically.
 
 If the current process (`Distributed.myid()`) is part of the pool, resp. if
 `withmyid` is `true`, it will be used as a fallback when no other workers are
-in are members of the pool (e.g. because no other processes have been added
+members of the pool (e.g. because no other processes have been added
 yet or because all other processes in the pool have terminated and been
 removed from it). The current process will *not* be used as a fallback when
 all other workers are currently in use.
@@ -26,7 +26,7 @@ If `maxoccupancy`is greater than one, individual workers can be used
 ID `pid` multiple times without a `put!(pool, pid)` in between. Such a
 (ideally moderate) oversubscription can be useful to reduce latency-related
 idle times on workers: e.g. if communication latency to the worker
-is not short compared the the runtime of the function called on them. Or if
+is not short compared to the runtime of the function called on them. Or if
 the remote functions are often blocked waiting for I/O. Note: Workers still
 must be put back the same number of times they were taken from the pool,
 in total.
@@ -320,7 +320,7 @@ end
 """
     clear_worker_caches!(pool::AbstractWorkerPool)
 
-Clear the worker caches (cached function closures, etc.) on the workers In
+Clear the worker caches (cached function closures, etc.) on the workers in
 `pool`.
 
 Does nothing if the pool doesn't perform any on-worker caching.

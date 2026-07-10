@@ -9,7 +9,7 @@ ParallelProcessingTools default thread pinning mode.
 Constructor:
 
 ```julia
-AutoThreadPinning(; random::Bool = false, pin_blas::Bool = false)
+AutoThreadPinning(; random::Bool = false, blas::Bool = false)
 ```
 
 Arguments:

@@ -4,7 +4,7 @@
 """
     TimelimitExceeded <: Exception
 
-Exception thrown something timed out.
+Exception thrown when something times out.
 """
 struct TimelimitExceeded <: Exception
     max_time::Float64
@@ -155,7 +155,7 @@ _return_type(f, args::Tuple) = Core.Compiler.return_type(f, typeof(args))
                 @warn "Running $activity on worker $worker timed out after $elapsed_time s (max runtime $(maxtime) s)"
 
                 if worker == myid()
-                    @warn "Will not terminate main process $worker, making it available again, but it may still running timed-out $activity"
+                    @warn "Will not terminate main process $worker, making it available again, but it may still be running timed-out $activity"
                 else
                     @warn "Terminating worker $worker due to activity maxtime"
                     rmprocs(worker)

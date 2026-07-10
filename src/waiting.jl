@@ -10,7 +10,7 @@ const _g_sleep_yield_threshold = 3 * _g_sleep_0_time_ns
 const _g_sleep_sleep_0_threshold = 3 * _g_sleep_t_time_ns
 
 """
-    sleep_ns(t_in_ns::Real)
+    sleep_ns(t_in_ns::Integer)
 
 Sleep for `t_in_ns` nanoseconds, using a mixture of `yield()`, `sleep(0)`
 and `sleep(t)` to be able sleep for short times as well as long times with

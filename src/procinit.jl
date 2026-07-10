@@ -287,11 +287,8 @@ When using a [`FlexWorkerPool`](@ref), worker initialization can safely be run
 in the background though, as the pool will only offer workers
 (via `take!(pool)`) after it has fully initialized them.
 
-See also [`ParallelProcessingTools.get_procinit_code`](@ref)
-and [`ParallelProcessingTools.add_procinit_code`](@ref).
-
 See also [`ParallelProcessingTools.get_procinit_code`](@ref),
-[`ParallelProcessingTools.ensure_procinit`](@ref),
+[`ParallelProcessingTools.add_procinit_code`](@ref),
 [`ParallelProcessingTools.global_procinit_level`](@ref) and
 [`ParallelProcessingTools.current_procinit_level`](@ref).
 """
@@ -361,7 +358,7 @@ function ensure_procinit_or_kill(pid::Int)
         ensure_procinit(pid)
     catch err
         orig_err = inner_exception(err)
-        @warn "Error while initializig process $pid, removing it." orig_err
+        @warn "Error while initializing process $pid, removing it." orig_err
         rmprocs(pid)
     end
     return nothing

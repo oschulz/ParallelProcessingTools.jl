@@ -18,10 +18,10 @@ task, n = runworkers(runmode)
 
 Threads.@async begin
     wait(task)
-    @info "SLURM workers have terminated."
+    @info "Local workers have terminated."
 end
 
-@wait_while nprocs()-1 < n)
+@wait_while nprocs()-1 < n
 ```
 
 Workers can also be started manually, use

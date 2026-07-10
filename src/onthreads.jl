@@ -51,7 +51,7 @@ end
 """
     allthreads()
 
-Convencience function, returns an equivalent of `1:Base.Threads.nthreads()`.
+Convenience function, returns an equivalent of `1:Base.Threads.nthreads()`.
 """
 allthreads() = Base.OneTo(Base.Threads.nthreads())
 export allthreads
@@ -64,11 +64,11 @@ Execute code in `expr` in parallel on the threads in `threadsel`.
 
 `threadsel` should be a single thread-ID or a range (or array) of thread-ids.
 If `threadsel == Base.Threads.threadid()`, `expr` is run on the current
-tread with only minimal overhead.
+thread with only minimal overhead.
 
 Example 1:
 
-```juliaexpr
+```julia
 tlsum = ThreadLocal(0.0)
 data = rand(100)
 @onthreads allthreads() begin
@@ -113,12 +113,13 @@ multi-threaded tasks.
 
 Example:
 
-```
+```julia
 @mt_out_of_order begin
     a = foo()
     bar()
     c = baz()
 end
+```
 
 will run `a = foo()`, `bar()` and `c = baz()` in parallel and in arbitrary
 order, results of assignments will appear in the outside scope.

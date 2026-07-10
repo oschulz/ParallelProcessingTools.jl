@@ -34,9 +34,8 @@ original_exception(err::RemoteException) = original_exception(err.captured.ex)
 """
     ParallelProcessingTools.onlyfirst_exception(err)
 
-Replaces `CompositeException`s with their first exception.
-
-Also employs `inner_exception` if `simplify` is `true`.
+Replaces `CompositeException`s with their first exception. Leaves other
+exceptions unchanged.
 """
 function onlyfirst_exception end
 export onlyfirst_exception
@@ -54,7 +53,7 @@ If multiple exceptions originate from parallel code in `expr`, only one
 is rethrown, and `TaskFailedException`s and `RemoteException`s are replaced
 by the original exceptions that caused them.
 
-See [`inner_exception`] and [`onlyfirst_exception`](@ref).
+See [`inner_exception`](@ref) and [`onlyfirst_exception`](@ref).
 """
 macro userfriendly_exceptions(expr)
     quote

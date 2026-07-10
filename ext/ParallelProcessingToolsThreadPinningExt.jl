@@ -200,4 +200,4 @@ ThreadPinning.pinthreads(::ParallelProcessingTools.AutoThreadPinning) = nothing
 end # if _threadpinning_supported
     
 
-end # module ChangesOfVariablesInverseFunctionsExt
+end # module ParallelProcessingToolsThreadPinningExt

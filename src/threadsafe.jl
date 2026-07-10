@@ -80,9 +80,9 @@ Example:
 @onthreads allthreads() begin
     @critical @info Base.Threads.threadid()
 end
+```
 
 Without `@critical`, the above will typically crash Julia.
-```
 """
 macro critical(expr)
     quote
