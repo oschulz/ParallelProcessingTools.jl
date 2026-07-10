@@ -24,7 +24,7 @@ include("testtools.jl")
     end
 
     @testset "macro mt_async" begin
-        @test_deprecated begin
+        @test_deprecated r"deprecated"i begin
             n = 128
             A = zeros(n)
             @sync for i in eachindex(A)
@@ -39,7 +39,7 @@ include("testtools.jl")
 
     pids = classic_addprocs(2)
     @testset "macro mp_async" begin
-        @test_deprecated begin
+        @test_deprecated r"deprecated"i begin
             n = 128
             A = Vector{Future}(undef, n)
             @sync for i in 1:n
