@@ -16,7 +16,7 @@ Example:
 runmode = OnLocalhost(n = 4)
 task, n = runworkers(runmode)
 
-Threads.@async begin
+@async begin
     wait(task)
     @info "Local workers have terminated."
 end
@@ -56,7 +56,7 @@ end
 function runworkers(runmode::OnLocalhost, manager::ElasticManager)
     start_cmd, m, n = worker_start_command(runmode, manager)
 
-    task = Threads.@async begin
+    task = @async begin
         processes = Base.Process[]
         for _ in 1:m
             push!(processes, open(start_cmd))

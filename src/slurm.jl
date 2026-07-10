@@ -23,7 +23,7 @@ Example:
 runmode = OnSlurm(slurm_flags = `--ntasks=4 --cpus-per-task=8 --mem-per-cpu=8G`)
 task, n = runworkers(runmode)
 
-Threads.@async begin
+@async begin
     wait(task)
     @info "SLURM workers have terminated."
 end
@@ -103,7 +103,7 @@ end
 function runworkers(runmode::OnSlurm, manager::ElasticManager)
     srun_cmd, m, n = worker_start_command(runmode, manager)
     @info "Starting SLURM job: $srun_cmd"
-    task = Threads.@async begin
+    task = @async begin
         process = open(srun_cmd)
         wait(process)
         @info "SLURM job terminated: $srun_cmd"

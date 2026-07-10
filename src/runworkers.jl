@@ -155,7 +155,7 @@ function _get_elasticmgr_add_to_pool_callback(get_workerpool::Function = ppt_wor
     function mgr_add_too_pool(::ElasticManager, pid::Integer, op::Symbol)
         pool = get_workerpool()::AbstractWorkerPool
         if op == :register
-            Threads.@async begin
+            @async begin
                 @debug "Adding process $pid to worker pool $(getlabel(pool))."
                 push!(pool, pid)
                 @debug "Added process $pid to worker pool $(getlabel(pool))."
