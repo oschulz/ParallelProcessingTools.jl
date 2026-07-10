@@ -150,11 +150,7 @@ function _slurm_parse_shortopt(opt::Char, args::Vector{String}, i::Int, default)
                 throw(ArgumentError("Missing value for option \"-$opt\""))
             end
         elseif startswith(arg, "-$opt")
-            if length(arg) > 2
-                return arg[begin+2:end], i+1
-            else
-                throw(ArgumentError("Missing value for option \"-$opt\""))
-            end
+            return arg[begin+2:end], i+1
         else
             return default, i
         end
