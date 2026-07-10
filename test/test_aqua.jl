@@ -5,7 +5,7 @@ import Aqua
 import ParallelProcessingTools
 
 Test.@testset "Package ambiguities" begin
-    Test.@test isempty(Test.detect_ambiguities(ParallelProcessingTools))
+    Test.@test isempty(Test.detect_ambiguities(ParallelProcessingTools, recursive = true))
 end # testset
 
 Test.@testset "Aqua tests" begin
