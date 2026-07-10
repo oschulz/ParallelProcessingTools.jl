@@ -524,7 +524,7 @@ end
 function write_files(
     @nospecialize(filenames::AbstractString...);
     mode::WriteMode = CreateOrIgnore(),
-    use_cache::Bool = false, @nospecialize(cache_dirname::AbstractString = default_cache_dir()),
+    use_cache::Bool = false, @nospecialize(cache_dir::AbstractString = default_cache_dir()),
     create_dirs::Bool = true, delete_tmp_onerror::Bool=true,
     verbose::Bool = false
 )
@@ -532,7 +532,7 @@ function write_files(
 
     loglevel = verbose ? Info : Debug
 
-    cache_dir = String(cache_dirname) # Fix type
+    cache_dir = String(cache_dir) # Fix type
     target_fnames = String[filenames...] # Fix type
     staging_fnames = String[]
     cache_fnames = String[]
