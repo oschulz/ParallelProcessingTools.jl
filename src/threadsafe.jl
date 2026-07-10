@@ -53,7 +53,7 @@ LockableIO(x::T) where {T<:IO} = LockableIO{T}(x)
 end
 
 @inline Base.read!(lio::LockableIO, args...; kwargs...) = map(lio) do io
-    read(io, args...; kwargs...)
+    read!(io, args...; kwargs...)
 end
 
 @inline Base.write(lio::LockableIO, args...; kwargs...) = map(lio) do io
