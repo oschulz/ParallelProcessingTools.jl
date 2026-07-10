@@ -120,7 +120,7 @@ function _default_slurm_flags()
 end
 
 
-const _slurm_memunits = IdDict{Char,Int}('K' => 1024^1, 'M' => 1024^2, 'G' => 1024^3, 'T' => 1024^4)
+const _slurm_memunits = IdDict{Char,Int64}('K' => Int64(1024)^1, 'M' => Int64(1024)^2, 'G' => Int64(1024)^3, 'T' => Int64(1024)^4)
 
 const _slurm_memsize_regex = r"^([0-9]+)(([KMGT])B?)?$"
 function _slurm_parse_memoptval(memsize::AbstractString)
@@ -129,7 +129,7 @@ function _slurm_parse_memoptval(memsize::AbstractString)
     if isnothing(m)
         throw(ArgumentError("Invalid SLURM memory size specification \"$s\""))
     else
-        value = parse(Int, m.captures[1])
+        value = parse(Int64, m.captures[1])
         unitchar = only(something(m.captures[3], 'M'))
         unitmult = _slurm_memunits[unitchar]
         return value * unitmult

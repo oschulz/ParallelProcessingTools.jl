@@ -9,12 +9,12 @@ using ParallelProcessingTools: _slurm_parse_memoptval, _slurm_parse_intoptval,
 @testset "slurm" begin
     @testset "SLURM option values" begin
         @test _slurm_parse_memoptval(nothing) === nothing
-        @test _slurm_parse_memoptval("100") == 100 * 1024^2
-        @test _slurm_parse_memoptval("16K") == 16 * 1024
-        @test _slurm_parse_memoptval("2M") == 2 * 1024^2
-        @test _slurm_parse_memoptval("32G") == 32 * 1024^3
-        @test _slurm_parse_memoptval("32GB") == 32 * 1024^3
-        @test _slurm_parse_memoptval("1T") == 1024^4
+        @test _slurm_parse_memoptval("100") == 100 * Int64(1024)^2
+        @test _slurm_parse_memoptval("16K") == 16 * Int64(1024)
+        @test _slurm_parse_memoptval("2M") == 2 * Int64(1024)^2
+        @test _slurm_parse_memoptval("32G") == 32 * Int64(1024)^3
+        @test _slurm_parse_memoptval("32GB") == 32 * Int64(1024)^3
+        @test _slurm_parse_memoptval("1T") == Int64(1024)^4
         @test_throws ArgumentError _slurm_parse_memoptval("32Q")
         @test_throws ArgumentError _slurm_parse_memoptval("foo")
 
@@ -33,14 +33,14 @@ using ParallelProcessingTools: _slurm_parse_memoptval, _slurm_parse_intoptval,
 
         tc = _get_slurm_taskconf(`--ntasks=4 --cpus-per-task=8 --mem-per-cpu=2G`, no_env)
         @test tc == (
-            n_tasks = 4, cpus_per_task = 8, mem_per_cpu = 2 * 1024^3,
+            n_tasks = 4, cpus_per_task = 8, mem_per_cpu = 2 * Int64(1024)^3,
             n_nodes = nothing, ntasks_per_node = nothing, mem_per_node = nothing
         )
 
         tc = _get_slurm_taskconf(`-n 4 -c8 -N 2 --mem=16G --ntasks-per-node=2`, no_env)
         @test tc == (
             n_tasks = 4, cpus_per_task = 8, mem_per_cpu = nothing,
-            n_nodes = 2, ntasks_per_node = 2, mem_per_node = 16 * 1024^3
+            n_nodes = 2, ntasks_per_node = 2, mem_per_node = 16 * Int64(1024)^3
         )
 
         slurm_env = Dict(
@@ -49,7 +49,7 @@ using ParallelProcessingTools: _slurm_parse_memoptval, _slurm_parse_intoptval,
         )
         tc = _get_slurm_taskconf(``, slurm_env)
         @test tc == (
-            n_tasks = 6, cpus_per_task = 2, mem_per_cpu = 1024^3,
+            n_tasks = 6, cpus_per_task = 2, mem_per_cpu = Int64(1024)^3,
             n_nodes = 3, ntasks_per_node = nothing, mem_per_node = nothing
         )
 
@@ -78,9 +78,10 @@ using ParallelProcessingTools: _slurm_parse_memoptval, _slurm_parse_intoptval,
         @test _slurm_nworkers(merge(template, (n_nodes = 2, ntasks_per_node = 3))) == 6
         @test_throws ArgumentError _slurm_nworkers(template)
 
-        @test _slurm_mem_per_task(merge(template, (cpus_per_task = 4, mem_per_cpu = 1024^3))) == 4 * 1024^3
-        @test _slurm_mem_per_task(merge(template, (n_nodes = 2, ntasks_per_node = 4, mem_per_node = 8 * 1024^3))) == 2 * 1024^3
-        @test _slurm_mem_per_task(merge(template, (n_nodes = 2, n_tasks = 4, mem_per_node = 8 * 1024^3))) == 4 * 1024^3
+        GiB = Int64(1024)^3
+        @test _slurm_mem_per_task(merge(template, (cpus_per_task = 4, mem_per_cpu = GiB))) == 4 * GiB
+        @test _slurm_mem_per_task(merge(template, (n_nodes = 2, ntasks_per_node = 4, mem_per_node = 8 * GiB))) == 2 * GiB
+        @test _slurm_mem_per_task(merge(template, (n_nodes = 2, n_tasks = 4, mem_per_node = 8 * GiB))) == 4 * GiB
         @test _slurm_mem_per_task(template) === nothing
     end
 
