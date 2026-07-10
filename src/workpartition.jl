@@ -111,10 +111,10 @@ end
 
 @deprecate(
     workpartition(A::AbstractArray, n::Integer, i::Integer),
-    workpart(A, 1::n, i)
+    workpart(A, 1:n, i)
 )
 
 @deprecate(
     threadpartition(A::AbstractArray, n_threads::Integer = length(allthreads()), i::Integer = threadid()),
-    workpart(A, 1::n_threads, i)
+    workpart(A, 1:n_threads, i)
 )

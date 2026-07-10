@@ -53,5 +53,11 @@ include("testtools.jl")
     end
     rmprocs(pids)
 
+    @testset "workpartition and threadpartition" begin
+        A = collect(1:10)
+        @test (@test_deprecated ParallelProcessingTools.workpartition(A, 3, 1)) == workpart(A, 1:3, 1)
+        @test (@test_deprecated ParallelProcessingTools.threadpartition(A, 2, 2)) == workpart(A, 1:2, 2)
+    end
+
     @test_deprecated pinthreads_auto() isa Nothing
 end
