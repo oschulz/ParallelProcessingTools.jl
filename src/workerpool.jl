@@ -236,10 +236,7 @@ function Base.take!(fwp::FlexWorkerPool)
                 return pid
             catch err
                 orig_err = inner_exception(err)
-                @warn "Error while initializig process $pid, removing it." orig_err
-                lock(fwp._worker_mgmt) do
-                    fwp._worker_occupancy[pid] -= 1
-                end
+                @warn "Error while initializing process $pid, removing it." orig_err
                 rmprocs(pid)
                 put!(fwp, pid)
             end
