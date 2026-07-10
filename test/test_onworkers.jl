@@ -98,7 +98,11 @@ end
 
     @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(gen_mayfail(1), "bar"; tries = 2, label = "mayfail")
     @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(mytask, 2, "foo", maxtime = 0.5, tries = 2)
-    
+
+    @test original_exception(
+        @return_exceptions onworker(() -> throw(MyExceptionNoRetry("no retry")), label = "noretry")
+    ) isa MyExceptionNoRetry
+
     runworkers(OnLocalhost(n = 2))
 
     timer = Timer(30)
@@ -119,6 +123,15 @@ end
 
     @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(gen_mayfail(1), "bar"; tries = 2, label = "mayfail")
 
+    @test original_exception(
+        @return_exceptions onworker(() -> throw(MyExceptionNoRetry("no retry")), label = "noretry")
+    ) isa MyExceptionNoRetry
+
+    @testset "elastic manager pool callback" begin
+        callback = ParallelProcessingTools._get_elasticmgr_add_to_pool_callback()
+        manager = ParallelProcessingTools.ppt_cluster_manager()
+        @test_logs (:error, r"Unknown ElasticManager manage op") callback(manager, 9999, :bogus)
+    end
 
     #=
     # Run these manually for now. Not sure how to make Test enviroment ignore the

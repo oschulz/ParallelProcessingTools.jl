@@ -122,4 +122,14 @@ using Distributed: myid, remotecall
         @test_throws ArgumentError whyfailed(empty_open_channel)
         @test whyfailed(bad_closed_channel) isa ErrorException
     end
+
+    @testset "non-exception task failure" begin
+        stuck_task = Task(() -> wait())
+        schedule(stuck_task)
+        yield()
+        schedule(stuck_task, :stopped, error = true)
+        @wait_while maxtime=10 timeout_error=true !istaskdone(stuck_task)
+        @test hasfailed(stuck_task)
+        @test whyfailed(stuck_task) isa ErrorException
+    end
 end

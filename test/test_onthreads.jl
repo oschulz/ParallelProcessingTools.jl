@@ -35,6 +35,12 @@ using Base.Threads
         end) == 1:nthreads()
     end
 
+    @testset "current-thread fast path" begin
+        tl = ThreadLocal(0)
+        @onthreads threadid() tl[] = threadid() + 100
+        @test tl[] == threadid() + 100
+    end
+
     @testset "non-contiguous threadsel" begin
         @test (begin
             tl = ThreadLocal(0)
@@ -53,6 +59,8 @@ using Base.Threads
 
 
     @testset "macro mt_out_of_order" begin
+        @test_throws ErrorException @macroexpand @mt_out_of_order 42
+
         @test begin
             b = 0
             foo() = b = 9

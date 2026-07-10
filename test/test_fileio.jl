@@ -260,6 +260,74 @@ ENV["JULIA_DEBUG"] = old_julia_debug * ",ParallelProcessingTools"
             end
         end
     end
+
+    @testset "write_files edge cases" begin
+        mktempdir() do dir
+            fn1 = joinpath(dir, "hello.txt")
+            fn2 = joinpath(dir, "world.txt")
+
+            @test write_files() isa Nothing
+            @test write_files(() -> error("must not be called")) isa Nothing
+
+            # Only some of the target files existing is an inconsistent state:
+            write(fn1, "Hello")
+            @test_throws ErrorException write_files(fn1, fn2)
+            @test_throws ErrorException write_files(fn1, fn2, mode = CreateOrModify())
+            @test_throws ErrorException write_files(fn1, fn2, mode = ModifyExisting())
+            rm(fn1)
+
+            # Cache directory is created on demand:
+            cache_dir = joinpath(dir, "write_cache")
+            @test write_files(fn1, use_cache = true, cache_dir = cache_dir) do fn
+                write(fn, "Hello")
+            end == (fn1,)
+            @test isdir(cache_dir)
+            rm(fn1)
+
+            # Closing twice is a no-op:
+            ftw = write_files(fn1)
+            write(only(collect(ftw)), "Hello")
+            close(ftw)
+            @test close(ftw) isa Nothing
+            @test read(fn1, String) == "Hello"
+            rm(fn1)
+
+            # Target files that appear while writing are not replaced with CreateOrIgnore:
+            ftw = write_files(fn1)
+            write(only(collect(ftw)), "Hello")
+            write(fn1, "already there")
+            close(ftw)
+            @test read(fn1, String) == "already there"
+            @test !any(isfile, ftw._staging_fnames)
+            rm(fn1)
+
+            # Only some target files appearing while writing is an error:
+            ftw = write_files(fn1, fn2)
+            foreach(fn -> write(fn, "Hello"), ftw)
+            write(fn1, "already there")
+            @test_throws ErrorException close(ftw)
+            rm(fn1)
+        end
+    end
+
+    @testset "read_files edge cases" begin
+        mktempdir() do dir
+            fn1 = joinpath(dir, "hello.txt")
+            write(fn1, "Hello")
+
+            @test_throws ErrorException read_files(fn -> error("Some error"), fn1)
+
+            # Cache directory is created on demand:
+            cache_dir = joinpath(dir, "read_cache")
+            @test read_files(fn -> read(fn, String), fn1, use_cache = true, cache_dir = cache_dir) == "Hello"
+            @test isdir(cache_dir)
+
+            # A closed FilesToRead can't be iterated anymore:
+            ftr = read_files(fn1, use_cache = false)
+            close(ftr)
+            @test_throws InvalidStateException collect(ftr)
+        end
+    end
 end
 
 ENV["JULIA_DEBUG"] = old_julia_debug; nothing

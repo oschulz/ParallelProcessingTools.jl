@@ -57,6 +57,8 @@ ENV["JULIA_DEBUG"] = old_julia_debug * ",ParallelProcessingTools"
     @test _execute_procinit_code(get_procinit_code(), global_procinit_level()) isa Nothing
     @test current_procinit_level() == global_procinit_level()
     @test Main._g_inittest3 == 103
+    # Re-running at the same init level is a no-op:
+    @test _execute_procinit_code(get_procinit_code(), global_procinit_level()) isa Nothing
     @info "The following \"Failed to raise process 1 init level\" error message is expected"
     @test_throws ErrorException _execute_procinit_code(get_procinit_code(), global_procinit_level() + 1)
 

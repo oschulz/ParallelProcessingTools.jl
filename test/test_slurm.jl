@@ -56,6 +56,16 @@ using ParallelProcessingTools: _slurm_parse_memoptval, _slurm_parse_intoptval,
         tc = _get_slurm_taskconf(`--ntasks=12`, slurm_env)
         @test tc.n_tasks == 12
         @test tc.cpus_per_task == 2
+
+        # Unknown options are skipped, separate-value long options work:
+        tc = _get_slurm_taskconf(`--partition=main --ntasks 4`, no_env)
+        @test tc.n_tasks == 4
+
+        @test_throws ArgumentError _get_slurm_taskconf(`-n`, no_env)
+        @test_throws ArgumentError _get_slurm_taskconf(`-n -c4`, no_env)
+        @test_throws ArgumentError _get_slurm_taskconf(`--ntasks`, no_env)
+        @test_throws ArgumentError _get_slurm_taskconf(`--ntasks=`, no_env)
+        @test_throws ArgumentError _get_slurm_taskconf(`--ntasks --nodes=2`, no_env)
     end
 
     @testset "workers and memory per task" begin
