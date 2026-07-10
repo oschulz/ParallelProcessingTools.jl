@@ -263,9 +263,10 @@ function _elastic_worker_startjl(
     """import ParallelProcessingTools; ParallelProcessingTools.elastic_worker("$cookie", "$address", $port, forward_stdout=$redirect_output, env=$env_vec)"""
 end
 
-const _default_addprocs_params = Distributed.default_addprocs_params()
-
-_default_julia_cmd() = `$(_default_addprocs_params[:exename]) $(_default_addprocs_params[:exeflags])`
+function _default_julia_cmd()
+    params = Distributed.default_addprocs_params()
+    `$(params[:exename]) $(params[:exeflags])`
+end
 _default_julia_flags() = ``
 _default_julia_project() = Pkg.project().path
 
