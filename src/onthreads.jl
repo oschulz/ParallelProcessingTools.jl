@@ -19,9 +19,8 @@ end
 
 # Adapted from Julia PR 32477:
 function _threading_run(func, threadsel::AbstractVector{<:Integer})
-    tasks = Vector{Task}(undef, length(eachindex(threadsel)))
-    for tid in threadsel
-        i = firstindex(tasks) + (tid - first(threadsel))
+    tasks = Vector{Task}(undef, length(threadsel))
+    for (i, tid) in enumerate(threadsel)
         tasks[i] = _run_on(Task(func), tid)
     end
     foreach(wait, tasks)

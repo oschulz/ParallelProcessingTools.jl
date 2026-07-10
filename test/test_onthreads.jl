@@ -35,6 +35,22 @@ using Base.Threads
         end) == 1:nthreads()
     end
 
+    @testset "non-contiguous threadsel" begin
+        @test (begin
+            tl = ThreadLocal(0)
+            @onthreads reverse(collect(allthreads())) tl[] = threadid()
+            getallvalues(tl)
+        end) == 1:nthreads()
+
+        if nthreads() >= 3
+            tl = ThreadLocal(0)
+            threadsel = [1, nthreads()]
+            @onthreads threadsel tl[] = threadid()
+            @test getallvalues(tl)[threadsel] == threadsel
+            @test all(iszero, getallvalues(tl)[2:end-1])
+        end
+    end
+
 
     @testset "macro mt_out_of_order" begin
         @test begin
