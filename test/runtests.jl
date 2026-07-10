@@ -13,7 +13,9 @@ Test.@testset "Package ParallelProcessingTools" begin
 
     include("test_aqua.jl")
     include("test_memory.jl")
+    include("test_display.jl")
     include("test_waiting.jl")
+    include("test_exceptions.jl")
     include("test_states.jl")
     include("test_fileio.jl")
     include("test_threadsafe.jl")
@@ -24,6 +26,8 @@ Test.@testset "Package ParallelProcessingTools" begin
     include("test_procinit.jl")
     include("test_workerpool.jl")
     include("test_onworkers.jl")
+    include("test_slurm.jl")
+    include("test_htcondor.jl")
     include("test_ext_threadpinning.jl")
     include("test_deprecated.jl")
     include("test_docs.jl")

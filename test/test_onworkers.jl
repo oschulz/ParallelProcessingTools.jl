@@ -54,6 +54,19 @@ end
         end
     end
 
+    if !Sys.iswindows()
+        @testset "write_worker_start_script $(nameof(typeof(runmode)))" begin
+            mktempdir(prefix = "ppt-startscript-test") do dir
+                startscript = write_worker_start_script(joinpath(dir, "startjlworkers.sh"), runmode)
+                @test isfile(startscript)
+                script_content = read(startscript, String)
+                @test occursin("julia", script_content)
+                @test occursin("xargs", script_content)
+                @test_throws ArgumentError write_worker_start_script(joinpath(dir, "startjlworkers.txt"), runmode)
+            end
+        end
+    end
+
     #=
     # Run manually for now, fails when run during CI tests for some reason:
 
