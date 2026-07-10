@@ -54,6 +54,19 @@ end
         end
     end
 
+    if !Sys.iswindows()
+        @testset "write_worker_start_script $(nameof(typeof(runmode)))" begin
+            mktempdir(prefix = "ppt-startscript-test") do dir
+                startscript = write_worker_start_script(joinpath(dir, "startjlworkers.sh"), runmode)
+                @test isfile(startscript)
+                script_content = read(startscript, String)
+                @test occursin("julia", script_content)
+                @test occursin("xargs", script_content)
+                @test_throws ArgumentError write_worker_start_script(joinpath(dir, "startjlworkers.txt"), runmode)
+            end
+        end
+    end
+
     #=
     # Run manually for now, fails when run during CI tests for some reason:
 
@@ -85,7 +98,28 @@ end
 
     @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(gen_mayfail(1), "bar"; tries = 2, label = "mayfail")
     @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(mytask, 2, "foo", maxtime = 0.5, tries = 2)
-    
+
+    @test original_exception(
+        @return_exceptions onworker(() -> throw(MyExceptionNoRetry("no retry")), label = "noretry")
+    ) isa MyExceptionNoRetry
+
+    @testset "worker loss" begin
+        # Worker losses don't count against tries, but are capped at 3 * tries:
+        pids = classic_addprocs(4)
+        die_pool = FlexWorkerPool{WorkerPool}(pids, init_workers = false)
+        @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(
+            () -> exit(), pool = die_pool, label = "worker_killer"
+        )
+        @test !any(in(procs()), pids)
+
+        # Recovers if a worker is lost and another can take over:
+        pids2 = classic_addprocs(2)
+        mixed_pool = FlexWorkerPool{WorkerPool}([myid(), pids2[1]], init_workers = false)
+        @test onworker(() -> (myid() == 1 ? 42 : exit()), pool = mixed_pool, label = "lossy") == 42
+        @test !(pids2[1] in procs())
+        stopworkers()
+    end
+
     runworkers(OnLocalhost(n = 2))
 
     timer = Timer(30)
@@ -106,6 +140,15 @@ end
 
     @test_throws ParallelProcessingTools.MaxTriesExceeded onworker(gen_mayfail(1), "bar"; tries = 2, label = "mayfail")
 
+    @test original_exception(
+        @return_exceptions onworker(() -> throw(MyExceptionNoRetry("no retry")), label = "noretry")
+    ) isa MyExceptionNoRetry
+
+    @testset "elastic manager pool callback" begin
+        callback = ParallelProcessingTools._get_elasticmgr_add_to_pool_callback()
+        manager = ParallelProcessingTools.ppt_cluster_manager()
+        @test_logs (:error, r"Unknown ElasticManager manage op") callback(manager, 9999, :bogus)
+    end
 
     #=
     # Run these manually for now. Not sure how to make Test enviroment ignore the

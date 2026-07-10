@@ -19,9 +19,8 @@ end
 
 # Adapted from Julia PR 32477:
 function _threading_run(func, threadsel::AbstractVector{<:Integer})
-    tasks = Vector{Task}(undef, length(eachindex(threadsel)))
-    for tid in threadsel
-        i = firstindex(tasks) + (tid - first(threadsel))
+    tasks = Vector{Task}(undef, length(threadsel))
+    for (i, tid) in enumerate(threadsel)
         tasks[i] = _run_on(Task(func), tid)
     end
     foreach(wait, tasks)
@@ -52,9 +51,12 @@ end
 """
     allthreads()
 
-Convencience function, returns an equivalent of `1:Base.Threads.nthreads()`.
+Returns the thread IDs of all threads in the default threadpool.
+
+Returns an equivalent of `1:Base.Threads.nthreads()` if no interactive
+threads are present.
 """
-allthreads() = Base.OneTo(Base.Threads.nthreads())
+allthreads() = Threads.threadpooltids(:default)
 export allthreads
 
 
@@ -65,11 +67,11 @@ Execute code in `expr` in parallel on the threads in `threadsel`.
 
 `threadsel` should be a single thread-ID or a range (or array) of thread-ids.
 If `threadsel == Base.Threads.threadid()`, `expr` is run on the current
-tread with only minimal overhead.
+thread with only minimal overhead.
 
 Example 1:
 
-```juliaexpr
+```julia
 tlsum = ThreadLocal(0.0)
 data = rand(100)
 @onthreads allthreads() begin
@@ -81,13 +83,13 @@ sum(getallvalues(tlsum)) ≈ sum(data)
 Example 2:
 
 ```julia
-# Assuming 4 threads:
+# Assuming 4 threads in the default threadpool:
 tl = ThreadLocal(42)
-threadsel = 2:3
+threadsel = allthreads()[2:3]
 @onthreads threadsel begin
     tl[] = Base.Threads.threadid()
 end
-getallvalues(tl)[threadsel] == [2, 3]
+getallvalues(tl)[2:3] == threadsel
 getallvalues(tl)[[1,4]] == [42, 42]
 ```
 """
@@ -99,7 +101,6 @@ export @onthreads
 
 function ThreadLocal{T}(f::Base.Callable) where {T}
     result = ThreadLocal{T}(undef)
-    result.value
     @onthreads allthreads() result.value[threadid()] = f()
     result
 end
@@ -115,12 +116,13 @@ multi-threaded tasks.
 
 Example:
 
-```
+```julia
 @mt_out_of_order begin
     a = foo()
     bar()
     c = baz()
 end
+```
 
 will run `a = foo()`, `bar()` and `c = baz()` in parallel and in arbitrary
 order, results of assignments will appear in the outside scope.
@@ -145,7 +147,6 @@ macro mt_out_of_order(ex)
                 exprs[i] = esc(exprs[i])
             end
         elseif exprs[i] isa Expr
-            ftvar = gensym()
             exprs[i] = :(push!($tasks, Base.Threads.@spawn($(esc(exprs[i])))))
             push!(handle_results, :(wait(popfirst!($tasks))))
         else

@@ -57,6 +57,8 @@ ENV["JULIA_DEBUG"] = old_julia_debug * ",ParallelProcessingTools"
     @test _execute_procinit_code(get_procinit_code(), global_procinit_level()) isa Nothing
     @test current_procinit_level() == global_procinit_level()
     @test Main._g_inittest3 == 103
+    # Re-running at the same init level is a no-op:
+    @test _execute_procinit_code(get_procinit_code(), global_procinit_level()) isa Nothing
     @info "The following \"Failed to raise process 1 init level\" error message is expected"
     @test_throws ErrorException _execute_procinit_code(get_procinit_code(), global_procinit_level() + 1)
 
@@ -79,9 +81,13 @@ ENV["JULIA_DEBUG"] = old_julia_debug * ",ParallelProcessingTools"
     classic_addprocs(2)
     ensure_procinit(workers()[end])
 
-    @test remotecall_fetch(last(workers())) do 
+    @test remotecall_fetch(last(workers())) do
         _g_inittest1 + _g_inittest2 + _g_inittest3 + _g_inittest4 + _g_somevar1 + _g_somevar2
     end == 813
+
+    # @always_everywhere must init all current workers without explicit ensure_procinit:
+    @always_everywhere _g_somevar3 = 203
+    @test all(pid -> remotecall_fetch(() -> Main._g_somevar3, pid) == 203, workers())
 
     rmprocs(workers())
 end

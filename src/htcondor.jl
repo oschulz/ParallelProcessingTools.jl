@@ -83,7 +83,7 @@ function _generate_condor_worker_script(filename, runmode::OnHTCondor, manager::
     additional_julia_flags = `$jl_threads_flag $jl_heap_size_hint_flag $julia_flags`
     worker_cmd = worker_local_startcmd(
         manager;
-        julia_flags = `$julia_flags $additional_julia_flags`,
+        julia_flags = additional_julia_flags,
         redirect_output = runmode.redirect_output, env = runmode.env
     )
     depot_path = join(runmode.julia_depot, ":")

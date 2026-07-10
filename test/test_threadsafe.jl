@@ -35,7 +35,7 @@ using Base.Threads
         map(seekstart, lv)
         @test read(lv, Int) == 10
         map(seekstart, lv)
-        @test read!(lv, Int) == 10
+        @test read!(lv, zeros(Int, 1)) == [10]
 
         map(seekstart, lv)        
         write(lv, 11)

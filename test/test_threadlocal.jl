@@ -1,4 +1,4 @@
-# This file is a part of BAT.jl, licensed under the MIT License (MIT).
+# This file is a part of ParallelProcessingTools.jl, licensed under the MIT License (MIT).
 
 using ParallelProcessingTools
 using Test
@@ -8,9 +8,9 @@ using Base.Threads
     @testset "ThreadLocal" begin
         tl = @inferred ThreadLocal{Float32}(undef)
         @test typeof(tl) <: ThreadLocal{Float32}
-        @test length(tl.value) == nthreads()
+        @test length(getallvalues(tl)) == nthreads()
 
-        @test (@inferred getallvalues(ThreadLocal{Int}(threadid))) == 1:nthreads()
+        @test (@inferred getallvalues(ThreadLocal{Int}(threadid))) == allthreads()
 
         tmp = 2.5
         tl = @inferred ThreadLocal(tmp)

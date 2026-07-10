@@ -21,9 +21,9 @@ Example:
 
 ```julia
 runmode = OnSlurm(slurm_flags = `--ntasks=4 --cpus-per-task=8 --mem-per-cpu=8G`)
-task = runworkers(runmode)
+task, n = runworkers(runmode)
 
-Threads.@async begin
+@async begin
     wait(task)
     @info "SLURM workers have terminated."
 end
@@ -70,7 +70,7 @@ function worker_start_command(runmode::OnSlurm, manager::ElasticManager)
 
     worker_cmd = worker_local_startcmd(
         manager;
-        julia_flags = `$julia_flags $additional_julia_flags`,
+        julia_flags = additional_julia_flags,
         redirect_output = runmode.redirect_output, env = runmode.env
     )
 
@@ -103,7 +103,7 @@ end
 function runworkers(runmode::OnSlurm, manager::ElasticManager)
     srun_cmd, m, n = worker_start_command(runmode, manager)
     @info "Starting SLURM job: $srun_cmd"
-    task = Threads.@async begin
+    task = @async begin
         process = open(srun_cmd)
         wait(process)
         @info "SLURM job terminated: $srun_cmd"
@@ -120,7 +120,7 @@ function _default_slurm_flags()
 end
 
 
-const _slurm_memunits = IdDict{Char,Int}('K' => 1024^1, 'M' => 1024^2, 'G' => 1024^3, 'T' => 1024^4)
+const _slurm_memunits = IdDict{Char,Int64}('K' => Int64(1024)^1, 'M' => Int64(1024)^2, 'G' => Int64(1024)^3, 'T' => Int64(1024)^4)
 
 const _slurm_memsize_regex = r"^([0-9]+)(([KMGT])B?)?$"
 function _slurm_parse_memoptval(memsize::AbstractString)
@@ -129,7 +129,7 @@ function _slurm_parse_memoptval(memsize::AbstractString)
     if isnothing(m)
         throw(ArgumentError("Invalid SLURM memory size specification \"$s\""))
     else
-        value = parse(Int, m.captures[1])
+        value = parse(Int64, m.captures[1])
         unitchar = only(something(m.captures[3], 'M'))
         unitmult = _slurm_memunits[unitchar]
         return value * unitmult
@@ -150,11 +150,7 @@ function _slurm_parse_shortopt(opt::Char, args::Vector{String}, i::Int, default)
                 throw(ArgumentError("Missing value for option \"-$opt\""))
             end
         elseif startswith(arg, "-$opt")
-            if length(arg) > 2
-                return arg[begin+2:end], i+1
-            else
-                throw(ArgumentError("Missing value for option \"-$opt\""))
-            end
+            return arg[begin+2:end], i+1
         else
             return default, i
         end

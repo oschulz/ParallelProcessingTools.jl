@@ -24,7 +24,7 @@ include("testtools.jl")
     end
 
     @testset "macro mt_async" begin
-        @test_deprecated begin
+        @test_deprecated r"deprecated"i begin
             n = 128
             A = zeros(n)
             @sync for i in eachindex(A)
@@ -39,7 +39,7 @@ include("testtools.jl")
 
     pids = classic_addprocs(2)
     @testset "macro mp_async" begin
-        @test_deprecated begin
+        @test_deprecated r"deprecated"i begin
             n = 128
             A = Vector{Future}(undef, n)
             @sync for i in 1:n
@@ -52,6 +52,12 @@ include("testtools.jl")
         end
     end
     rmprocs(pids)
+
+    @testset "workpartition and threadpartition" begin
+        A = collect(1:10)
+        @test (@test_deprecated ParallelProcessingTools.workpartition(A, 3, 1)) == workpart(A, 1:3, 1)
+        @test (@test_deprecated ParallelProcessingTools.threadpartition(A, 2, 2)) == workpart(A, 1:2, 2)
+    end
 
     @test_deprecated pinthreads_auto() isa Nothing
 end

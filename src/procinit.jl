@@ -198,15 +198,14 @@ See also [`ParallelProcessingTools.get_procinit_code`](@ref) and
 
         _global_procinit_level[] = next_init_level
         _current_procinit_level[] = next_init_level
-
-        return nothing
     finally
         unlock(allprocs_management_lock())
     end
 
     if run_everywhere
-        ensure_procinit_or_kill(pids)
+        ensure_procinit_or_kill(workers())
     end
+    return nothing
 end
 
 
@@ -288,11 +287,8 @@ When using a [`FlexWorkerPool`](@ref), worker initialization can safely be run
 in the background though, as the pool will only offer workers
 (via `take!(pool)`) after it has fully initialized them.
 
-See also [`ParallelProcessingTools.get_procinit_code`](@ref)
-and [`ParallelProcessingTools.add_procinit_code`](@ref).
-
 See also [`ParallelProcessingTools.get_procinit_code`](@ref),
-[`ParallelProcessingTools.ensure_procinit`](@ref),
+[`ParallelProcessingTools.add_procinit_code`](@ref),
 [`ParallelProcessingTools.global_procinit_level`](@ref) and
 [`ParallelProcessingTools.current_procinit_level`](@ref).
 """
@@ -362,7 +358,7 @@ function ensure_procinit_or_kill(pid::Int)
         ensure_procinit(pid)
     catch err
         orig_err = inner_exception(err)
-        @warn "Error while initializig process $pid, removing it." orig_err
+        @warn "Error while initializing process $pid, removing it." orig_err
         rmprocs(pid)
     end
     return nothing

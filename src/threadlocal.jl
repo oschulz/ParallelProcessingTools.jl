@@ -7,12 +7,12 @@
 Abstract type for thread-local values of type `T`.
 
 The value for the current thread is accessed via
-`getindex(::AbstractThreadLocal)` and `setindex(::AbstractThreadLocal, x).
+`getindex(::AbstractThreadLocal)` and `setindex!(::AbstractThreadLocal, x)`.
 
 To access both regular and thread-local values in a unified manner, use
 the function [`getlocalvalue`](@ref).
 
-To get the all values across all threads, use the function
+To get all values across all threads, use the function
 [`getallvalues`](@ref).
 
 Default implementation is [`ThreadLocal`](@ref).
@@ -34,8 +34,9 @@ export getlocalvalue
 """
     getallvalues(v::AbstractThreadLocal{T})::AbstractVector{T}
 
-Access the all values (one for each thread) of a thread-local value as a
-vector. Can only be called in single-threaded code sections.
+Access all values (one for each thread in the default threadpool, in
+thread-ID order) of a thread-local value as a vector. Can only be called
+in single-threaded code sections.
 """
 function getallvalues end
 export getallvalues
@@ -62,6 +63,10 @@ ThreadLocal(value::T) where {T}
 ThreadLocal{T}(f::Base.Callable) where {T}
 ```
 
+`ThreadLocal{T}()` initializes the value on each thread to `T()`,
+`ThreadLocal{T}(f)` to `f()`, and `ThreadLocal(value)` to a `deepcopy`
+of `value`.
+
 Examples:
 
 ```julia
@@ -79,10 +84,10 @@ struct ThreadLocal{T} <: AbstractThreadLocal{T}
     value::Vector{T}
 
     ThreadLocal{T}(::UndefInitializer) where {T} =
-        new{T}(_protect_from_resize(Vector{T}(undef, nthreads())))
+        new{T}(_protect_from_resize(Vector{T}(undef, Threads.maxthreadid())))
 
     ThreadLocal{T}(value::T) where {T} =
-        new{T}(_protect_from_resize([deepcopy(value) for i in 1:nthreads()]))
+        new{T}(_protect_from_resize([deepcopy(value) for i in 1:Threads.maxthreadid()]))
 end
 
 export ThreadLocal
@@ -123,6 +128,4 @@ Base.get!(x::ThreadLocal, default) = get!(() -> default, x)
 
 Base.isassigned(x::ThreadLocal) = isassigned(x.value, threadid())
 
-function getallvalues(x::ThreadLocal)
-    x.value
-end
+getallvalues(x::ThreadLocal) = view(x.value, allthreads())

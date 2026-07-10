@@ -22,7 +22,7 @@ include("testtools.jl")
 
         @test (@onprocs workers() myid()) == workers()
 
-        threadinfo = [collect(1:n) for n in [fetch(@spawnat w nthreads()) for w in workers()]]
+        threadinfo = [fetch(@spawnat w allthreads()) for w in workers()]
         ref_result = ((w,t) -> (proc = w, threads = t)).(workers(), threadinfo)
 
         @test (@onprocs workers() begin

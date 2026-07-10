@@ -83,9 +83,11 @@ A = rand(100)
 # ...
 sub_A = workpart(A, workers(), myid())
 # ...
-idxs = workpart(eachindex(sub_A), allthreads(), threadid())
-for i in idxs
-    # ...
+@onthreads allthreads() begin
+    idxs = workpart(eachindex(sub_A), allthreads(), threadid())
+    for i in idxs
+        # ...
+    end
 end
 ```
 """
@@ -111,10 +113,10 @@ end
 
 @deprecate(
     workpartition(A::AbstractArray, n::Integer, i::Integer),
-    workpart(A, 1::n, i)
+    workpart(A, 1:n, i)
 )
 
 @deprecate(
     threadpartition(A::AbstractArray, n_threads::Integer = length(allthreads()), i::Integer = threadid()),
-    workpart(A, 1::n_threads, i)
+    workpart(A, 1:n_threads, i)
 )

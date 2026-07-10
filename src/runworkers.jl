@@ -9,7 +9,7 @@ ParallelProcessingTools default thread pinning mode.
 Constructor:
 
 ```julia
-AutoThreadPinning(; random::Bool = false, pin_blas::Bool = false)
+AutoThreadPinning(; random::Bool = false, blas::Bool = false)
 ```
 
 Arguments:
@@ -155,7 +155,7 @@ function _get_elasticmgr_add_to_pool_callback(get_workerpool::Function = ppt_wor
     function mgr_add_too_pool(::ElasticManager, pid::Integer, op::Symbol)
         pool = get_workerpool()::AbstractWorkerPool
         if op == :register
-            Threads.@async begin
+            @async begin
                 @debug "Adding process $pid to worker pool $(getlabel(pool))."
                 push!(pool, pid)
                 @debug "Added process $pid to worker pool $(getlabel(pool))."
@@ -263,9 +263,10 @@ function _elastic_worker_startjl(
     """import ParallelProcessingTools; ParallelProcessingTools.elastic_worker("$cookie", "$address", $port, forward_stdout=$redirect_output, env=$env_vec)"""
 end
 
-const _default_addprocs_params = Distributed.default_addprocs_params()
-
-_default_julia_cmd() = `$(_default_addprocs_params[:exename]) $(_default_addprocs_params[:exeflags])`
+function _default_julia_cmd()
+    params = Distributed.default_addprocs_params()
+    `$(params[:exename]) $(params[:exeflags])`
+end
 _default_julia_flags() = ``
 _default_julia_project() = Pkg.project().path
 

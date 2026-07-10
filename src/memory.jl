@@ -21,7 +21,7 @@ Values of `-1` mean unlimited.
 
 !!! note
     Currently only works on Linux, simply returns `(Int64(-1), Int64(-1))` on
-    other operationg systems.
+    other operating systems.
 """
 function memory_limit end
 export memory_limit
@@ -75,5 +75,5 @@ export memory_limit!
         return rlim[].cur, rlim[].max
     end
 else
-    memory_limit!(soft_limit::Integer, hard_limit::Integer) = Int64(-1), Int64(-1)
+    memory_limit!(soft_limit::Integer, hard_limit::Integer = Int64(-1)) = Int64(-1), Int64(-1)
 end

@@ -1,10 +1,10 @@
 # This file is a part of ParallelProcessingTools.jl, licensed under the MIT License (MIT).
 
 """
-    ParallelProcessingTools.NonZeroExitCode(cmd::Cmd, exitcode::Integer) isa Exception
+    ParallelProcessingTools.NonZeroExitCode(exitcode::Integer) isa Exception
 
-Exception to indicate that a an external process running `cmd` failed with the
-given exit code (not equal zero).
+Exception to indicate that an external process failed with the given exit
+code (not equal zero).
 """
 struct NonZeroExitCode <: Exception
     exitcode::Int

@@ -87,7 +87,7 @@ end
     ParallelProcessingTools.default_cache_dir()::String
 
 Returns the default cache directory, e.g. for [`write_files`](@ref) and
-`read_files`(@ref).
+[`read_files`](@ref).
 
 See also [`default_cache_dir!`](@ref).
 """
@@ -114,7 +114,7 @@ end
 
 Sets the default cache directory to `dir` and returns it.
 
-See also [`default_cache_dir!`](@ref).
+See also [`default_cache_dir`](@ref).
 """
 function default_cache_dir!(dir::AbstractString)
     lock(_g_default_cachedir_lock) do
@@ -180,8 +180,8 @@ _should_overwrite_if_necessary(::CreateOrIgnore) = false
 """
     CreateNew() isa WriteMode
 
-Indicates that new files should be created and to throw and eror if the files
-already exist.
+Indicates that new files should be created and that an error should be thrown
+if the files already exist.
 
 See [`WriteMode`](@ref) and [`write_files`](@ref).
 """
@@ -190,7 +190,7 @@ export CreateNew
 
 function _already_done(::CreateNew, target_fnames::AbstractVector{<:String}, any_pre_existing::Bool, all_pre_existing::Bool, loglevel::LogLevel)
     if any_pre_existing
-        throw(ErrorException("Some, but not all of $target_fnames exist, but not allowed to replace files"))
+        throw(ErrorException("Some or all of $target_fnames exist already, but not allowed to replace files"))
     else
         return false
     end
@@ -220,7 +220,7 @@ _should_overwrite_if_necessary(::CreateOrReplace) = true
 
 
 """
-    CreateOrIgnore() isa WriteMode
+    CreateOrModify() isa WriteMode
 
 Indicates that either new files should be created, or that existing files
 should be modified.
@@ -279,7 +279,7 @@ write to.
 With `ftw::FilesToWrite`, use `collect(ftw)` or `iterate(ftw)` to access the
 filenames to write to. Use `close(ftw)` or `close(ftw, true)` to close things
 in good order, indicating success, and use `close(ftw, false)` or
-`close(ftw, err:Exception)` to abort, indicating failure.
+`close(ftw, err::Exception)` to abort, indicating failure.
 
 See [`write_files`](@ref) for example code.
 
@@ -436,9 +436,9 @@ on the OS and file-system used).
 [`ModifyExisting()`](@ref).
 
 If a writing function `f_write` is given, calls
-`f_create(temporary_filenames...)`. If `f_create` doesn't throw an exception,
+`f_write(temporary_filenames...)`. If `f_write` doesn't throw an exception,
 the files `temporary_filenames` are renamed to `filenames`, otherwise
-the temporary files are are either deleted (if `delete_tmp_onerror` is `true)
+the temporary files are either deleted (if `delete_tmp_onerror` is `true`)
 or left in place (e.g. for debugging purposes).
 
 Set `ENV["JULIA_DEBUG"] = "ParallelProcessingTools"` to see a log of all
@@ -457,7 +457,7 @@ end
 files were (re-)written or `nothing` if there was nothing to do (depending
 on `mode`).
 
-If no writing funcion `f_write` is given then, `write_files` returns an object
+If no writing function `f_write` is given then, `write_files` returns an object
 of type [`FilesToWrite`](@ref) that holds the temporary filenames. Closing it
 will, like above, either rename temporary files to `filenames` or remove them.
 So
@@ -524,7 +524,7 @@ end
 function write_files(
     @nospecialize(filenames::AbstractString...);
     mode::WriteMode = CreateOrIgnore(),
-    use_cache::Bool = false, @nospecialize(cache_dirname::AbstractString = default_cache_dir()),
+    use_cache::Bool = false, @nospecialize(cache_dir::AbstractString = default_cache_dir()),
     create_dirs::Bool = true, delete_tmp_onerror::Bool=true,
     verbose::Bool = false
 )
@@ -532,7 +532,7 @@ function write_files(
 
     loglevel = verbose ? Info : Debug
 
-    cache_dir = String(cache_dirname) # Fix type
+    cache_dir = String(cache_dir) # Fix type
     target_fnames = String[filenames...] # Fix type
     staging_fnames = String[]
     cache_fnames = String[]
@@ -643,9 +643,9 @@ function Base.close(ftr::FilesToRead, @nospecialize(reason::Union{Bool,Exception
     ftr._isopen[] = false
 
     if reason == true
-        # @debug "Reading from to $(ftr._source_fnames) was indicated to have succeeded."
+        # @debug "Reading from $(ftr._source_fnames) was indicated to have succeeded."
     elseif reason == false
-        @debug "Reading from to $(ftr._source_fnames) was indicated to have failed."
+        @debug "Reading from $(ftr._source_fnames) was indicated to have failed."
     else
         @debug "Aborted reading from $(ftr._source_fnames) due to exception:" reason
     end
@@ -704,7 +704,7 @@ result = read_files("foo.txt", "bar.txt", use_cache = true) do foo, bar
 end
 ```
 
-If no reading funcion `f_read` is given, then `read_files` returns an object
+If no reading function `f_read` is given, then `read_files` returns an object
 of type [`FilesToRead`](@ref) that holds the temporary filenames. Closing it
 will clean up temporary files, like described above. So
 

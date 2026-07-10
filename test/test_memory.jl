@@ -10,11 +10,13 @@ using ParallelProcessingTools
         new_limits = (limit, -1)
         if Sys.islinux()
             @test @inferred(memory_limit!(new_limits...)) == new_limits
+            @test @inferred(memory_limit!(limit)) == new_limits
             @test @inferred(memory_limit()) == new_limits
             stricter_limit = round(Int, 0.9*limit)
             @test_throws ArgumentError @inferred(memory_limit!(limit, stricter_limit))
         else
             @test @inferred(memory_limit!(new_limits...)) == (-1, -1)
+            @test @inferred(memory_limit!(limit)) == (-1, -1)
             @test @inferred(memory_limit()) == (-1, -1)
         end
     end

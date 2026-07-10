@@ -66,6 +66,15 @@ using Test
             res = vcat(res, @inferred workpart(cmp_res, 1:part, i))
         end
         @test res == cmp_res
+
+        A = collect(1:10)
+        @test workpart(A, [2, 5, 7], 5) == workpart(A, 1:3, 2)
+        @test_throws ArgumentError workpart(A, [5, 2, 7], 5)
+        @test_throws ArgumentError workpart(A, [2, 2, 7], 2)
+        @test_throws ArgumentError workpart(A, [2, 5, 7], 3)
+        @test workpart(A, 4, 4) === A
+        @test_throws ArgumentError workpart(A, 4, 5)
+        @test isempty(ParallelProcessingTools._workpart_scheme(Base.OneTo(10), 3, 0))
     end
 
     @testset "Examples" begin
@@ -75,9 +84,11 @@ using Test
             # ...
             sub_A = workpart(A, procs(), myid())
             # ...
-            idxs = workpart(eachindex(sub_A), allthreads(), threadid())
-            for i in idxs
-                # ...
+            @onthreads allthreads() begin
+                idxs = workpart(eachindex(sub_A), allthreads(), threadid())
+                for i in idxs
+                    # ...
+                end
             end
             true
         end
