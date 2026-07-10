@@ -84,9 +84,11 @@ using Test
             # ...
             sub_A = workpart(A, procs(), myid())
             # ...
-            idxs = workpart(eachindex(sub_A), allthreads(), threadid())
-            for i in idxs
-                # ...
+            @onthreads allthreads() begin
+                idxs = workpart(eachindex(sub_A), allthreads(), threadid())
+                for i in idxs
+                    # ...
+                end
             end
             true
         end

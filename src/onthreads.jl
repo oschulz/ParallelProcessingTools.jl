@@ -51,9 +51,12 @@ end
 """
     allthreads()
 
-Convenience function, returns an equivalent of `1:Base.Threads.nthreads()`.
+Returns the thread IDs of all threads in the default threadpool.
+
+Returns an equivalent of `1:Base.Threads.nthreads()` if no interactive
+threads are present.
 """
-allthreads() = Base.OneTo(Base.Threads.nthreads())
+allthreads() = Threads.threadpooltids(:default)
 export allthreads
 
 
@@ -80,13 +83,13 @@ sum(getallvalues(tlsum)) ≈ sum(data)
 Example 2:
 
 ```julia
-# Assuming 4 threads:
+# Assuming 4 threads in the default threadpool:
 tl = ThreadLocal(42)
-threadsel = 2:3
+threadsel = allthreads()[2:3]
 @onthreads threadsel begin
     tl[] = Base.Threads.threadid()
 end
-getallvalues(tl)[threadsel] == [2, 3]
+getallvalues(tl)[2:3] == threadsel
 getallvalues(tl)[[1,4]] == [42, 42]
 ```
 """

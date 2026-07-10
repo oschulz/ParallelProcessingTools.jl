@@ -32,7 +32,26 @@ using Base.Threads
             tl = ThreadLocal(0)
             @onthreads allthreads() tl[] = threadid()
             getallvalues(tl)
-        end) == 1:nthreads()
+        end) == allthreads()
+    end
+
+    @testset "interactive threadpool" begin
+        @test allthreads() == Threads.threadpooltids(:default)
+
+        prog = """
+        using ParallelProcessingTools, Base.Threads
+        @assert nthreads(:interactive) == 1 && nthreads(:default) == 2
+        @assert allthreads() == Threads.threadpooltids(:default)
+        tl = ThreadLocal(0)
+        @onthreads allthreads() tl[] = threadid()
+        @assert getallvalues(tl) == allthreads()
+        tl2 = ThreadLocal{Vector{Int}}()
+        @onthreads allthreads() push!(tl2[], threadid())
+        @assert sort!(reduce(vcat, getallvalues(tl2))) == allthreads()
+        println("OK")
+        """
+        cmd = `$(Base.julia_cmd()) --startup-file=no --project=$(Base.active_project()) -t 2,1 -e $prog`
+        @test strip(read(cmd, String)) == "OK"
     end
 
     @testset "current-thread fast path" begin
@@ -46,13 +65,13 @@ using Base.Threads
             tl = ThreadLocal(0)
             @onthreads reverse(collect(allthreads())) tl[] = threadid()
             getallvalues(tl)
-        end) == 1:nthreads()
+        end) == allthreads()
 
         if nthreads() >= 3
             tl = ThreadLocal(0)
-            threadsel = [1, nthreads()]
+            threadsel = allthreads()[[1, end]]
             @onthreads threadsel tl[] = threadid()
-            @test getallvalues(tl)[threadsel] == threadsel
+            @test getallvalues(tl)[[1, end]] == threadsel
             @test all(iszero, getallvalues(tl)[2:end-1])
         end
     end
@@ -89,14 +108,14 @@ using Base.Threads
 
         if nthreads() >= 4
             @testset "Example 2" begin
-                # Assuming 4 threads:
+                # Assuming 4 threads in the default threadpool:
                 tl = ThreadLocal(42)
-                threadsel = 2:3
+                threadsel = allthreads()[2:3]
                 @onthreads threadsel begin
                     tl[] = Base.Threads.threadid()
                 end
-                @test getallvalues(tl)[threadsel] == [2, 3]
-                @test getallvalues(tl)[[1,4]] == [42, 42]
+                @test getallvalues(tl)[2:3] == threadsel
+                @test getallvalues(tl)[[1,4]] == fill(42, 2)
             end
         end
     end
