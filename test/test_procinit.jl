@@ -79,9 +79,13 @@ ENV["JULIA_DEBUG"] = old_julia_debug * ",ParallelProcessingTools"
     classic_addprocs(2)
     ensure_procinit(workers()[end])
 
-    @test remotecall_fetch(last(workers())) do 
+    @test remotecall_fetch(last(workers())) do
         _g_inittest1 + _g_inittest2 + _g_inittest3 + _g_inittest4 + _g_somevar1 + _g_somevar2
     end == 813
+
+    # @always_everywhere must init all current workers without explicit ensure_procinit:
+    @always_everywhere _g_somevar3 = 203
+    @test all(pid -> remotecall_fetch(() -> Main._g_somevar3, pid) == 203, workers())
 
     rmprocs(workers())
 end

@@ -198,15 +198,14 @@ See also [`ParallelProcessingTools.get_procinit_code`](@ref) and
 
         _global_procinit_level[] = next_init_level
         _current_procinit_level[] = next_init_level
-
-        return nothing
     finally
         unlock(allprocs_management_lock())
     end
 
     if run_everywhere
-        ensure_procinit_or_kill(pids)
+        ensure_procinit_or_kill(workers())
     end
+    return nothing
 end
 
 
