@@ -57,8 +57,11 @@ ENV["JULIA_DEBUG"] = old_julia_debug * ",ParallelProcessingTools"
                 fn1 = joinpath(dir, "targetdir", "hello.txt")
                 fn2 = joinpath(dir, "targetdir", "world.txt")
 
+                foo_fn = joinpath(dir, "foo.txt")
+                bar_fn = joinpath(dir, "bar.txt")
+
                 @test write_files() isa Nothing
-                ftw = write_files("foo.txt", "bar.txt", mode = CreateOrIgnore(), use_cache = use_cache)
+                ftw = write_files(foo_fn, bar_fn, mode = CreateOrIgnore(), use_cache = use_cache)
                 @test ftw isa ParallelProcessingTools.FilesToWrite{CreateOrIgnore}
                 tmp_foo, tmp_bar = ftw
                 try
@@ -71,10 +74,10 @@ ENV["JULIA_DEBUG"] = old_julia_debug * ",ParallelProcessingTools"
                     close(ftw, err)
                 end
                 if !(throw_dummy_error || test_abort_write)
-                    @test all(isfile, ["foo.txt", "bar.txt"])
-                    @test read.(["foo.txt", "bar.txt"], String) == ["Hello", "World"]
-                    @test write_files("foo.txt", "bar.txt") isa Nothing
-                    rm.(["foo.txt", "bar.txt"])
+                    @test all(isfile, [foo_fn, bar_fn])
+                    @test read.([foo_fn, bar_fn], String) == ["Hello", "World"]
+                    @test write_files(foo_fn, bar_fn) isa Nothing
+                    rm.([foo_fn, bar_fn])
                 end
                 @test !in(tmp_foo, ParallelProcessingTools._g_files_to_clean_up)
                 @test !in(tmp_bar, ParallelProcessingTools._g_files_to_clean_up)
